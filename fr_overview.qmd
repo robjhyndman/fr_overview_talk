@@ -1055,7 +1055,7 @@ $$
 $$
 
 
-\nocite{htsgeometry, nonnegmint, Di_FonGir2022b, lhf}
+\nocite{hierarchical,fasthts, mint, hfreview, htsgeometry, nonnegmint, Di_FonGir2022b, lhf}
 
 
 ```{r}
@@ -1080,12 +1080,12 @@ An $n$-dimensional multivariate time series such that $\bm{y}_t\in\mathfrak{s}\q
 $\tilde{\bm{y}}_{t+h|t}$ is \emph{coherent} if $\tilde{\bm{y}}_{t+h|t} \in \mathfrak{s}$.
 \end{block}\vspace*{-0.2cm}
 \end{textblock}
-\only<2-3>{\begin{textblock}{7.5}(.2,6.75)\fontsize{13}{13}\sf
+{\begin{textblock}{7.5}(.2,6.75)\fontsize{13}{13}\sf
 \begin{alertblock}{Base forecasts}
 Let $\hat{\bm{y}}_{t+h|t}$ be vector of \emph{incoherent} initial $h$-step forecasts.$\phantom{y_{t|h}}$
 \end{alertblock}
 \end{textblock}}
-\only<3>{\begin{textblock}{7.5}(8.3,6.75)\fontsize{13}{13}\sf
+{\begin{textblock}{7.5}(8.3,6.75)\fontsize{13}{13}\sf
 \begin{alertblock}{Reconciled forecasts}
 Let $\psi$ be a mapping, $\psi:\mathbb{\chi}^n\rightarrow\mathfrak{s}$.  $\tilde{\bm{y}}_{t+h|t}=\psi(\hat{\bm{y}}_{t+h|t})$ ``reconciles'' $\hat{\bm{y}}_{t+h|t}$.
 \end{alertblock}
