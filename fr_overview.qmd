@@ -94,7 +94,7 @@ read_sf("tourism/Tourism_Regions_2020.shp") |>
   scale_fill_manual(values = state_colors)
 ```
 
-\only<2>{\begin{textblock}{6.5}(9.1,1.4)
+\only<2>{\begin{textblock}{6.5}(9.2,1.4)
 \begin{block}{}%\fontsize{12}{13}\sf
   \begin{itemize}\itemsep=0cm\parskip=0cm
     \item Monthly data on visitor night from 1998 -- 2017
@@ -633,28 +633,107 @@ gspapers |>
   ))
 ```
 
-## Forecasting notation
-\fontsize{14}{14.5}\sf
 
-Let $\hat{\bm{y}}_{T+h|T}$ be vector of initial $h$-step forecasts, made at time $T$, stacked in same order as $\by_t$. (In general, they will not "add up".)\pause
+## The coherent subspace
 
+\begin{textblock}{9}(.2,1)\fontsize{13}{13}\sf
+\begin{block}{Coherent subspace}
+$n_b$-dimensional linear subspace $\mathfrak{s}\subset \mathbb{\chi}^n$ for which linear constraints hold for all $\bm{y}\in\mathfrak{s}$.
+\end{block}\vspace*{-0.3cm}
+\begin{block}{Hierarchical time series}
+An $n$-dimensional multivariate time series such that $\bm{y}_t\in\mathfrak{s}\quad\forall t$.
+\end{block}\vspace*{-0.3cm}
+\begin{block}{Coherent point forecasts}
+$\tilde{\bm{y}}_{t+h|t}$ is \emph{coherent} if $\tilde{\bm{y}}_{t+h|t} \in \mathfrak{s}$.
+\end{block}\vspace*{-0.2cm}
+\end{textblock}
+\only<2-3>{\begin{textblock}{7.5}(.2,6.75)\fontsize{13}{13}\sf
+\begin{alertblock}{Base forecasts}
+Let $\hat{\bm{y}}_{t+h|t}$ be vector of \emph{incoherent} initial $h$-step forecasts.$\phantom{y_{t|h}}$
+\end{alertblock}
+\end{textblock}}
+\only<3>{\begin{textblock}{7.5}(8.3,6.75)\fontsize{13}{13}\sf
+\begin{alertblock}{Reconciled forecasts}
+Let $\psi$ be a mapping, $\psi:\mathbb{\chi}^n\rightarrow\mathfrak{s}$.  $\tilde{\bm{y}}_{t+h|t}=\psi(\hat{\bm{y}}_{t+h|t})$ ``reconciles'' $\hat{\bm{y}}_{t+h|t}$.
+\end{alertblock}
+\end{textblock}}
+
+\placefig{9.4}{.0}{width=6.6cm}{3D_hierarchy}
+\begin{textblock}{3}(11.4,5.6)\fontsize{13}{13}\sf
 \begin{block}{}
-Coherent linear forecasts are of the form:
+\centerline{$y_{Tot} = y_A + y_B$}
+\end{block}
+\end{textblock}
 
-\centerline{$\tilde{\bm{y}}_{T+h|T}=\bS\bm{G}\hat{\bm{y}}_{T+h|T}$}
-\end{block}\pause
+## Linear projection reconciliation
 
-* $\bm{G}$ extracts and combines base forecasts $\hat{\bm{y}}_{T+h|T}$ to get bottom-level forecasts.
-* $\bS$ creates linear combinations.
-* $\bS\bG$ is a projection matrix iff $\bS\bG\bS'=\bS$.
-* Reconciled forecasts are unbiased iff base forecasts are unbiased and $\bm{M}=\bS\bG$ is a projection.
-* $\bm{V}_h = \var[\by_{T+h} - \tilde{\by}_{T+h|T}  \mid \by_1,\dots,\by_T] = \bS\bG\bm{W}_{h}\bG'\bS' = \bm{M}\bm{W}_h\bm{M}'$
+\only<1>{\placefig{9.5}{1.5}{width=6.2cm}{InsampDir_2_George}}
+\only<2>{\placefig{9.5}{1.5}{width=6.2cm}{OrthProj_George}}
+\only<3->{\placefig{9.5}{1.5}{width=6.2cm}{ObliqProj_George}}
+
+\begin{textblock}{9}(.5,1.5)
+  \begin{itemize}\tightlist
+  \item $R$ is the most likely direction of deviations from $\mathfrak{s}$.
+  \only<1->{\item Grey: potential base forecasts}
+  \only<2->{\item Red: reconciled forecasts}
+  \only<2->{\item Orthogonal projections (i.e., OLS) lead to smallest possible adjustments of base forecasts.}
+  \only<3->{\item Oblique projections (i.e., MinT) give reconciled forecasts with smallest variance.}
+  \end{itemize}
+\end{textblock}
+
+\only<2->{
+  \begin{textblock}{4.6}(11.2,7.6)\fontsize{13}{14}\sf
+  \begin{block}{}
+  \only<2>{Orthogonal \rlap{projection}}
+  \only<3>{Oblique projection}
+  \end{block}
+  \end{textblock}
+}
+
+## Linear projection reconciliation
+\fontsize{14}{16}\sf
+\vspace*{0.2cm}\begin{alertblock}{}
+\centerline{$\tilde{\bm{y}}_{t+h|t}= \psi(\hat{\bm{y}}_{t+h|t}) = \bm{M}\hat{\bm{y}}_{t+h|t}$}
+\end{alertblock}\vspace*{-0.5cm}
+
+* $\bm{M}$ is a projection onto $\mathfrak{s}$ if and only if $\bm{M}\bm{y}=\bm{y}$ for all $\bm{y}\in\mathfrak{s}$.
+* Coherent base forecasts are unchanged since $\bm{M}\hat{\bm{y}}=\hat{\bm{y}}$
+* If $\hat{\bm{y}}$ is unbiased, then $\tilde{\bm{y}}$ is also unbiased since
+$$
+  \E(\tilde{\bm{y}}_{t+h|t}) = \E(\bm{M}\hat{\bm{y}}_{t+h|t}) = \bm{M} \E(\hat{\bm{y}}_{t+h|t}) = \E(\hat{\bm{y}}_{t+h|t}),
+$$
+and unbiased estimates must lie on $\mathfrak{s}$.
+* If $\bm{S}$ forms a basis set for $\mathfrak{s}$, then projections are of the form $\bm{M} = \bS(\bS'\bm{\Psi}\bS)^{-1}\bS'\bm{\Psi}$ where $\bm{\Psi}$ is a positive definite matrix.
+* The projection is orthogonal if and only if $\bm{M}'=\bm{M}$. Equivalently, $\bm{\Psi}=\bm{I}$.
+
+\vspace*{10cm}
+
+## Linear projection reconciliation
+
+\vspace*{0.2cm}\begin{alertblock}{}
+\centerline{$\tilde{\bm{y}}_{t+h|t}= \psi(\hat{\bm{y}}_{t+h|t}) = \bm{M}\hat{\bm{y}}_{t+h|t}$}\vspace{0.1cm}
+
+\centerline{where\quad $\bm{M} = \bS(\bS'\bm{\Psi}\bS)^{-1}\bS'\bm{\Psi} = \bm{I} - \bm{\Psi}\bm{C}'(\bm{C}\bm{\Psi}\bm{C}')^{-1}\bm{C}
+$}
+\end{alertblock}\vspace*{.01cm}
+\begin{block}{}\vspace*{-0.6cm}
+\begin{align*}
+&\text{OLS:}  && \bm{\Psi}=\bm{I} \\
+&\text{WLS:}  && \bm{\Psi}=\text{diagonal} \\
+&\text{MinT:} && \bm{\Psi}=\bm{W}_h
+\end{align*}
+\end{block}\vspace*{-0.3cm}
+
+* $\bm{W}_h = \var[\by_{T+h} - \hat{\by}_{T+h|T} \mid \by_1,\dots,\by_T]$ is the covariance matrix of the base forecast errors.
+* $\bm{V}_h = \var[\by_{T+h} - \tilde{\by}_{T+h|T}  \mid \by_1,\dots,\by_T])  = \bm{M}\bm{W}_h\bm{M}'$ is the covariance matrix of the reconciled forecast errors.
+
+\vspace*{10cm}
 
 ## Minimum trace reconciliation
 
 \vspace*{0.2cm}\begin{alertblock}{Minimum trace (MinT) reconciliation}
-If $\bm{M} = \bS\bG$ is a projection, then the trace of $\bm{V}_h$ is minimized when
-\centerline{$\bG = (\bS'\bm{W}_h^{-1}\bS)^{-1}\bS'\bm{W}_h^{-1}$}
+If $\bm{M}$ is a projection, then trace of $\bm{V}_h$ is minimized when
+\centerline{$\bm{M} = \bS(\bS'\bm{W}_h^{-1}\bS)^{-1}\bS'\bm{W}_h^{-1} =\bm{I} - \bm{W}_h\bm{C}'(\bm{C}\bm{W}_h\bm{C}')^{-1}\bm{C}$}
 \end{alertblock}
 \begin{block}{}
 \centerline{$\displaystyle\textcolor{red}{\tilde{\by}_{T+h|T}}
@@ -664,7 +743,6 @@ If $\bm{M} = \bS\bG$ is a projection, then the trace of $\bm{V}_h$ is minimized 
 
 * Trace of $\bm{V}_h$ is sum of forecast variances.
 * MinT is $L_2$ optimal amongst linear unbiased forecasts.
-* If $\bm{C}$ is full rank, then $\bm{M} = \bm{I} - \bm{W}_h\bm{C}'(\bm{C}\bm{W}_h\bm{C}')^{-1}\bm{C}$
 * How to estimate $\bm{W}_h = \var[\by_{T+h} - \hat{\by}_{T+h|T} \mid \by_1,\dots,\by_T]$?
 
 ## Linear projections
@@ -889,100 +967,6 @@ fc |>
 \end{block}
 \end{textblock}}
 
-# The geometry of forecast reconciliation
-
-## The coherent subspace
-
-\begin{textblock}{9}(.2,1)\fontsize{13}{13}\sf
-\begin{block}{Coherent subspace}
-$n_b$-dimensional linear subspace $\mathfrak{s}\subset \mathbb{\chi}^n$ for which linear constraints hold for all $\bm{y}\in\mathfrak{s}$.
-\end{block}\vspace*{-0.3cm}
-\begin{block}{Hierarchical time series}
-An $n$-dimensional multivariate time series such that $\bm{y}_t\in\mathfrak{s}\quad\forall t$.
-\end{block}\vspace*{-0.3cm}
-\begin{block}{Coherent point forecasts}
-$\tilde{\bm{y}}_{t+h|t}$ is \emph{coherent} if $\tilde{\bm{y}}_{t+h|t} \in \mathfrak{s}$.
-\end{block}\vspace*{-0.2cm}
-\end{textblock}
-\only<2-3>{\begin{textblock}{7.5}(.2,6.75)\fontsize{13}{13}\sf
-\begin{alertblock}{Base forecasts}
-Let $\hat{\bm{y}}_{t+h|t}$ be vector of \emph{incoherent} initial $h$-step forecasts.$\phantom{y_{t|h}}$
-\end{alertblock}
-\end{textblock}}
-\only<3>{\begin{textblock}{7.5}(8.3,6.75)\fontsize{13}{13}\sf
-\begin{alertblock}{Reconciled forecasts}
-Let $\psi$ be a mapping, $\psi:\mathbb{\chi}^n\rightarrow\mathfrak{s}$.  $\tilde{\bm{y}}_{t+h|t}=\psi(\hat{\bm{y}}_{t+h|t})$ ``reconciles'' $\hat{\bm{y}}_{t+h|t}$.
-\end{alertblock}
-\end{textblock}}
-
-\placefig{9.4}{.0}{width=6.6cm}{3D_hierarchy}
-\begin{textblock}{3}(11.4,5.6)\fontsize{13}{13}\sf
-\begin{block}{}
-\centerline{$y_{Tot} = y_A + y_B$}
-\end{block}
-\end{textblock}
-
-## Linear projection reconciliation
-
-\only<1>{\placefig{9.5}{1.5}{width=6.2cm}{InsampDir_2_George}}
-\only<2>{\placefig{9.5}{1.5}{width=6.2cm}{OrthProj_George}}
-\only<3->{\placefig{9.5}{1.5}{width=6.2cm}{ObliqProj_George}}
-
-\begin{textblock}{9}(.5,1.5)
-  \begin{itemize}\tightlist
-  \item $R$ is the most likely direction of deviations from $\mathfrak{s}$.
-  \only<1->{\item Grey: potential base forecasts}
-  \only<2->{\item Red: reconciled forecasts}
-  \only<2->{\item Orthogonal projections (i.e., OLS) lead to smallest possible adjustments of base forecasts.}
-  \only<3->{\item Oblique projections (i.e., MinT) give reconciled forecasts with smallest variance.}
-  \end{itemize}
-\end{textblock}
-
-\only<2->{
-  \begin{textblock}{4.55}(11.2,7.6)\fontsize{13}{14}\sf
-  \begin{block}{}
-  \only<2>{Orthogonal projection}
-  \only<3>{Oblique projection}
-  \end{block}
-  \end{textblock}
-}
-
-## Linear projection reconciliation
-\fontsize{14}{16}\sf
-\vspace*{0.2cm}\begin{alertblock}{}
-\centerline{$\tilde{\bm{y}}_{t+h|t}= \psi(\hat{\bm{y}}_{t+h|t}) = \bm{M}\hat{\bm{y}}_{t+h|t}$}
-\end{alertblock}\vspace*{-0.5cm}
-
-* $\bm{M}$ is a projection onto $\mathfrak{s}$ if and only if $\bm{M}\bm{y}=\bm{y}$ for all $\bm{y}\in\mathfrak{s}$.
-* Coherent base forecasts are unchanged since $\bm{M}\hat{\bm{y}}=\hat{\bm{y}}$
-* If $\hat{\bm{y}}$ is unbiased, then $\tilde{\bm{y}}$ is also unbiased since
-$$
-  \E(\tilde{\bm{y}}_{t+h|t}) = \E(\bm{M}\hat{\bm{y}}_{t+h|t}) = \bm{M} \E(\hat{\bm{y}}_{t+h|t}) = \E(\hat{\bm{y}}_{t+h|t}),
-$$
-and unbiased estimates must lie on $\mathfrak{s}$.
-* The projection is orthogonal if and only if $\bm{M}'=\bm{M}$.
-* If $\bm{S}$ forms a basis set for $\mathfrak{s}$, then projections are of the form $\bm{M} = \bS(\bS'\bm{\Psi}\bS)^{-1}\bS'\bm{\Psi}$ where $\bm{\Psi}$ is a positive definite matrix.
-
-\vspace*{10cm}
-
-## Linear projection reconciliation
-
-\vspace*{0.2cm}\begin{alertblock}{}
-\centerline{$\tilde{\bm{y}}_{t+h|t}= \psi(\hat{\bm{y}}_{t+h|t}) = \bm{M}\hat{\bm{y}}_{t+h|t},\qquad\text{where}\quad \bm{M} = \bS(\bS'\bm{\Psi}\bS)^{-1}\bS'\bm{\Psi}$}
-\end{alertblock}\vspace*{.01cm}
-\begin{block}{}\vspace*{-0.6cm}
-\begin{align*}
-&\text{OLS:}  && \bm{\Psi}=\bm{I} &&& \bm{M} & = \bm{S}(\bm{S}'\bm{S})^{-1}\bm{S}' && = \bm{I} - \bm{C}'(\bm{C}\bm{C}')^{-1}\bm{C} \\
-&\text{MinT:} && \bm{\Psi}=\bm{W}_h &&&\bm{M} & = \bS(\bS'\bm{W}_h^{-1}\bS)^{-1}\bS'\bm{W}_h^{-1} && = \bm{I} - \bm{W}_h\bm{C}'(\bm{C}\bm{W}_h\bm{C}')^{-1}\bm{C}
-\end{align*}
-\end{block}\vspace*{-0.3cm}
-
-* $\bm{M}$ is orthogonal iff $\bm{\Psi}=\bm{I}$.
-* $\bm{W}_h = \var[\by_{T+h} - \hat{\by}_{T+h|T} \mid \by_1,\dots,\by_T]$ is the covariance matrix of the base forecast errors.
-* $\bm{V}_h = \var[\by_{T+h} - \tilde{\by}_{T+h|T}  \mid \by_1,\dots,\by_T]  = \bm{M}\bm{W}_h\bm{M}'$ is minimized when  $\bm{\Psi} = \bm{W}_h$.
-
-\vspace*{10cm}
-
 ## Mean square error bounds
 
 \begin{textblock}{6.4}(9,-0.1)\begin{block}{}
@@ -997,7 +981,6 @@ Let $\|\bm{u}\|_{\bm{\Psi}} = \bm{u}'\bm{\Psi}\bm{u}$. Then
  * $\bm{\Psi}$-projection is guaranteed to improve forecast accuracy over base forecasts *using this distance measure*.
  * Distance reduction holds for any realisation and any forecast.
  * OLS reconciliation minimizes Euclidean distance.
- * Other measures of forecast accuracy may be worse.
 
 ## Mean square error bounds
 
@@ -2179,25 +2162,25 @@ The ``year'' can start in any quarter, giving overlapping blocks.
 \begin{textblock}{6}(0.2,1.2)
 \centering\fontsize{12}{13}\sf
 \textbf{Geographical division}\\
-\includegraphics[width = 5.8cm]{figs/ausreg2.pdf}\\
+\includegraphics[width = 5.5cm, trim= 0 0 180 0, clip=true]{fr_overview_files/figure-beamer/ausmap-1.pdf}\\[-0.4cm]
 \faTimes\\
 \textbf{Purpose of travel}\\
 {\fontsize{11}{12}\sf Holiday, Visiting friends \& relatives, Business, Other}
 \end{textblock}
 
 \begin{textblock}{10}(6.1,1)
-\fontsize{11}{14}\sf
+\fontsize{11}{14}\sf\tabcolsep=0.12cm
 \begin{itemize}
 \item \textbf{Grouped ts}\newline (geographical divisions $\times$ purpose of travel)
 
-\begin{tabular}{cccccc}
+\begin{tabular}{lccccc}
 \toprule
   & \textbf{AUS} & \textbf{States} & \textbf{Zones$^\ast$} & \textbf{Regions} & \textbf{Tot}\\
   \midrule
-  \textbf{g.d.} & {\color{newblue}1} & {\color{newblue}7} & {\color{newblue}21} & {\color{newblue}76} & 105 \\
-  \textbf{p.o.t.} & {\color{newblue}4} & {\color{newblue}28} & {\color{newblue}84} & {\color{avocado}304} & 420\\
+  \textbf{geographical} & {\color{newblue}1} & {\color{newblue}7} & {\color{newblue}21} & {\color{newblue}76} & 105 \\
+  \textbf{purpose} & {\color{newblue}4} & {\color{newblue}28} & {\color{newblue}84} & {\color{avocado}304} & 420\\
   \midrule
-  \textbf{Tot} & 5 & 35 & 105 & 380 & \textbf{525}\\
+  \textbf{total} & 5 & 35 & 105 & 380 & \textbf{525}\\
   \bottomrule
 \end{tabular}
 \centerline{{\color{newblue}$n_a = 221$}, {\color{avocado}$n_b = 304$}, and $\textbf{n = 525}$}
@@ -2275,6 +2258,8 @@ oct$_h(bshr)$             & {0.994}                             & {0.988}\\
 oct$_h(hshr)$             & {\textbf{0.969}}                    & {0.953}\\
 oct$_h(shr)$              & \textcolor{red}{1.007}              & \textcolor{red}{1.000}
 \end{tabular}
+
+# Final comments
 
 ## Software
 \fontsize{11}{12}\sf\vspace*{0.3cm}
