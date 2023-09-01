@@ -455,7 +455,7 @@ $t$.
 * We need to do this in a way that is computationally efficient.
 
 
-## Notation
+## Constraint notation
 
 \begin{textblock}{5.7}(11.4,0.1)
 \begin{minipage}{4cm}
@@ -514,7 +514,7 @@ $t$.
 \end{textblock}
 
 
-## Zero-constraint representation
+## Constraint notation
 \vspace*{0.2cm}
 
 \begin{block}{Aggregation matrix $\bm{A}$}
@@ -732,14 +732,14 @@ $}
 ## Minimum trace reconciliation
 
 \vspace*{0.2cm}\begin{alertblock}{Minimum trace (MinT) reconciliation}
-If $\bm{M}$ is a projection, then trace of $\bm{V}_h$ is minimized when
+If $\bm{M}$ is a projection, then trace of $\bm{V}_h$ is minimized when $\bm{\Psi} = \bm{W}_h$, so that
 \centerline{$\bm{M} = \bS(\bS'\bm{W}_h^{-1}\bS)^{-1}\bS'\bm{W}_h^{-1} =\bm{I} - \bm{W}_h\bm{C}'(\bm{C}\bm{W}_h\bm{C}')^{-1}\bm{C}$}
 \end{alertblock}
 \begin{block}{}
 \centerline{$\displaystyle\textcolor{red}{\tilde{\by}_{T+h|T}}
-=\bS(\bS'\bm{W}_h^{-1}\bS)^{-1}\bS'\bm{W}_h^{-1}\textcolor{blue}{\hat{\by}_{T+h|T}}$}
+= \bm{M} ~ \textcolor{blue}{\hat{\by}_{T+h|T}}$}
 \end{block}\vspace*{-0.2cm}
-\centerline{\hspace*{1cm}\textcolor{red}{Reconciled forecasts}\hfill\textcolor{blue}{Base forecasts}\hspace*{2cm}}\vspace*{-0.2cm}
+\centerline{\hspace*{1.4cm}\textcolor{red}{Reconciled forecasts}\hfill\textcolor{blue}{Base forecasts}\hspace*{2.9cm}}\vspace*{-0.2cm}
 
 * Trace of $\bm{V}_h$ is sum of forecast variances.
 * MinT is $L_2$ optimal amongst linear unbiased forecasts.
