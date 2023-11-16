@@ -1,0 +1,1618 @@
+---
+title: Forecast reconciliation
+subtitle: A brief overview
+author: Rob J Hyndman
+pdf-engine: pdflatex
+fig-width: 9
+fig-height: 4.5
+format:
+  beamer:
+    theme: monash
+    aspectratio: 169
+    fontsize: 14pt
+    section-titles: false
+    knitr:
+      opts_chunk:
+        dev: "CairoPDF"
+include-in-header: header.tex
+cite-method: biblatex
+bibliography: hts.bib
+biblio-title: References
+highlight-style: tango
+keep-tex: true
+execute:
+  echo: false
+  message: false
+  warning: false
+  cache: true
+---
+
+```{r}
+source("setup.R")
+```
+
+## Outline
+
+\vspace*{0.7cm}\tableofcontents
+
+# Hierarchical time series notation
+
+## Australian tourism regions
+
+```{r}
+#| label: ausmap
+#| fig-height: 3
+library(sf)
+# Use Okabe-Ito color-blind friendly color palette
+state_colors <- c(
+  `New South Wales` = "#56b4e9",
+  `Victoria` = "#0072b2",
+  `Queensland` = "#009e73",
+  `South Australia` = "#f0e442",
+  `Northern Territory` = "#d55e00",
+  `Western Australia` = "#e69f00",
+  `Tasmania` = "#cc79a7",
+  `Australian Capital Territory` = "#cccccc"
+)
+read_sf("tourism/Tourism_Regions_2020.shp") |>
+  rename(State = "STE_NAME16") |>
+  ggplot() +
+  geom_sf(aes(fill = State), alpha = 0.8) +
+  theme_void() +
+  theme(text = ggplot2::element_text(family = 'Fira Sans')) +
+  scale_fill_manual(values = state_colors)
+```
+
+\begin{textblock}{6.5}(9.1,1.4)
+\begin{block}{}%\fontsize{12}{13}\sf
+  \begin{itemize}\itemsep=0cm\parskip=0cm
+    \item Monthly data on visitor night from 1998 -- 2017
+    \item From \textit{National Visitor Survey}, annual interviews of 120,000 Australians aged 15+.
+    \item Geographical hierarchy split by
+    \begin{itemize}
+    \item 7 states
+    \item 27 zones
+    \item 75 regions
+    \end{itemize}
+  \end{itemize}
+\end{block}
+\end{textblock}
+
+## Australian tourism data
+
+```{r}
+#| label: tourism_plots
+#| fig-width: 12
+#| fig-height: 5
+
+p1 <- tourism |>
+  summarise(visitors = sum(visitors)) |>
+  autoplot(visitors) +
+  ylab("Overnight trips") + xlab("Month") +
+  scale_y_log10() +
+  ggtitle("Total domestic travel: Australia")
+p2 <- tourism |>
+  group_by(state) |>
+  summarise(visitors = sum(visitors)) |>
+  autoplot(visitors) +
+  ylab("Overnight trips") + xlab("Month") +
+  scale_y_log10() +
+  ggtitle("Total domestic travel: by state") +
+  scale_color_manual(
+    values =
+      c(
+        NSW = "#56b4e9",
+        VIC = "#0072b2",
+        QLD = "#009e73",
+        SA = "#f0e442",
+        NT = "#d55e00",
+        WA = "#e69f00",
+        TAS = "#cc79a7",
+        ACT = "#cccccc"
+      )
+  )
+p3 <- tourism |>
+  filter(state == "NSW") |>
+  group_by(zone) |>
+  summarise(visitors = sum(visitors)) |>
+  mutate(zone = paste0("NSW/", zone)) |>
+  autoplot(visitors) +
+  ylab("Overnight trips") + xlab("Month") +
+  scale_y_log10() +
+  ggtitle("Total domestic travel: NSW by zone") +
+  guides(colour = guide_legend(title = "state/zone"))
+p4 <- tourism |>
+  filter(zone == "South NSW") |>
+  autoplot(visitors) +
+  ylab("Overnight trips") + xlab("Month") +
+  scale_y_log10() +
+  ggtitle("Total domestic travel: South NSW by region")
+aligned_plots <- align_patches(p1, p2, p3, p4)
+for (i in seq_along(aligned_plots)) {
+  cairo_pdf(paste0("./figs/tourism", i, ".pdf"), width = 12 * .8, height = 5 * .8)
+  print(aligned_plots[[i]])
+  crop::dev.off.crop()
+}
+```
+
+\only<1>{\placefig{0.1}{1.4}{width=15.8cm}{tourism1}}
+\only<2>{\placefig{0.1}{1.4}{width=15.8cm}{tourism2}}
+\only<3>{\placefig{0.1}{1.4}{width=15.8cm}{tourism3}}
+\only<4>{\placefig{0.1}{1.4}{width=15.8cm}{tourism4}}
+
+## Hierarchical time series
+\vspace*{-0.2cm}
+
+A \alert{\textbf{hierarchical time series}} is a collection of several time series that are linked together in a hierarchical structure.
+
+\vspace*{-0.5cm}
+\begin{center}
+\begin{minipage}{9.6cm}
+\begin{block}{}
+\begin{tikzpicture}
+\tikzstyle{every node}=[ellipse,draw,inner sep=0.2pt,fill=red!15]
+\tikzstyle[level distance=.1cm]
+\tikzstyle[sibling distance=7cm]
+\tikzstyle{level 1}=[sibling distance=33mm,set style={{every node}+=[fill=blue!15]}]
+\tikzstyle{level 2}=[sibling distance=10mm,font=\small,set style={{every node}+=[fill=yellow]}]
+\node{Total}[edge from parent fork down]
+ child {node {A}
+   child {node {AA}}
+   child {node {AB}}
+   child {node {AC}}
+ }
+ child {node {B}
+   child {node {BA}}
+   child {node {BB}}
+   child {node {BC}}
+ }
+ child {node {C}
+   child {node {CA}}
+   child {node {CB}}
+   child {node {CC}}
+ };
+\end{tikzpicture}
+\end{block}
+\end{minipage}
+\end{center}
+
+\pause\alert{Examples}\vspace*{-0.4cm}
+
+ * Tourism by state and region
+ * Retail sales by product groups, sub groups, and SKUs
+
+## Grouped time series
+
+A \alert{\textbf{grouped time series}} is a collection of time series that can be grouped together in a number of non-hierarchical ways.
+
+\vspace*{-0.2cm}\begin{center}
+\begin{minipage}{9.2cm}
+\begin{block}{}
+\begin{tikzpicture}[level distance=1.5cm]
+\tikzstyle{every node}=[ellipse,draw,inner sep=0.2pt,outer sep=0pt, fill=red!15]
+\tikzstyle{level 1}=[sibling distance=23mm,set style={{every node}+=[fill=blue!15]},level distance=1cm]
+\tikzstyle{level 2}=[sibling distance=10mm,font=\small,set style={{every node}+=[fill=yellow]}, level distance=0.9cm]
+\node{Total}[edge from parent fork down]
+ child {node {A}
+   child {node {AX}}
+   child {node {AY}}
+ }
+ child {node {B}
+   child {node {BX}}
+   child {node {BY}}
+ };
+\end{tikzpicture}\hspace*{1cm}
+\begin{tikzpicture}[level distance=1.5cm]
+\tikzstyle{every node}=[ellipse,draw,inner sep=0.2pt,outer sep=0pt, fill=red!15]
+\tikzstyle{level 1}=[sibling distance=23mm,set style={{every node}+=[fill=blue!15]},level distance=1cm]
+\tikzstyle{level 2}=[sibling distance=10mm,font=\small,set style={{every node}+=[fill=yellow]}, level distance=0.9cm]
+\node{Total}[edge from parent fork down]
+ child {node {X}
+   child {node {AX}}
+   child {node {BX}}
+ }
+ child {node {Y}
+   child {node {AY}}
+   child {node {BY}}
+ };
+\end{tikzpicture}
+\end{block}
+\end{minipage}
+\end{center}
+
+\pause\alert{Examples}\vspace*{-0.4cm}
+
+ * Tourism by state and purpose of travel
+ * Retail sales by product groups/sub groups, and by countries/regions
+
+## Hierarchical and grouped time series
+
+\begin{textblock}{8.8}(0.2,1.5)
+Almost all collections of time series with linear constraints can be written \rlap{as}
+\centerline{\colorbox[RGB]{210,210,210}{$\bY_{t}=\color{blue}\bS\color{red}\bm{b}_{t}$}}
+\vspace*{-0.9cm}\begin{itemize}\parskip=0cm\itemsep=0cm
+\item $\by_t=$ vector of all series at time $t$
+\item $ y_{\text{Total},t}= $ aggregate of all series at time
+$t$.
+\item $ y_{X,t}= $ value of series $X$ at time $t$.
+\item $\color{red}{\bm{b}_t}=$ vector of most disaggregated series at time $t$
+\item $\color{blue}{\bS}=$ ``structural matrix'' containing the linear constraints.
+\end{itemize}
+\end{textblock}
+
+\begin{textblock}{5.7}(11.4,0.1)
+\begin{minipage}{4cm}
+\begin{block}{}\centering
+\begin{tikzpicture}
+\tikzstyle{every node}=[ellipse,draw,fill=red!15,inner sep=2pt]
+\tikzstyle[level distance=.3cm]
+\tikzstyle[sibling distance=12cm]
+\tikzstyle{level 1}=[sibling distance=10mm,font=\small,set style={{every node}+=[fill=blue!15]}]
+\node{Total}[edge from parent fork down]
+ child {node {A}
+ }
+ child {node {B}
+ }
+ child {node {C}
+ };
+\end{tikzpicture}
+\end{block}
+\end{minipage}
+\end{textblock}
+
+\begin{textblock}{5.7}(9.4,2.8)\fontsize{14}{15}\sf
+\begin{align*}
+\bY_{t}&= \begin{pmatrix}
+  y_{\text{Total},t}\\
+  y_{A,t}\\
+  y_{B,t}\\
+  y_{C,t}
+  \end{pmatrix}  \\
+  &= {\color{blue}\underbrace{\begin{pmatrix}
+                1 & 1 & 1 \\
+                1 & 0 & 0 \\
+                0 & 1 & 0\\
+                0 & 0 & 1
+                \end{pmatrix}}_{\bS}}
+     {\color{red}\underbrace{\begin{pmatrix}
+       y_{A,t}\\y_{B,t}\\y_{C,t}
+       \end{pmatrix}}_{\bm{b}_{t}}}
+\end{align*}
+\end{textblock}
+
+## The forecast reconciliation problem
+\fontsize{14}{15.5}\sf
+
+* We want "coherent" forecasts of all series --- i.e., the forecasts should obey the same constraints as the data.
+* We model and forecast all series independently. The resulting forecasts will almost certainly be incoherent.
+* We "reconcile" the forecasts to make them coherent.
+
+### Notation
+\vspace*{-0.3cm}
+
+* $\by_t =$ vector of data for all series at time $t$.
+* $\hat{\bm{y}}_{t+h|t} =$ vector of incoherent "base" forecasts for time $t+h$ using data to time $t$.
+* $\tilde{\bm{y}}_{t+h|t} =$ vector of coherent "reconciled" forecasts for time $t+h$ using data to time $t$.
+
+# Optimal linear forecast reconciliation
+
+## The coherent subspace
+
+\begin{textblock}{9}(.2,1)\fontsize{13}{13}\sf
+\begin{block}{Coherent subspace}
+$n_b$-dimensional linear subspace $\mathfrak{s}\subset \mathbb{\chi}^n$ for which linear constraints hold for all $\bm{y}\in\mathfrak{s}$.
+\end{block}\vspace*{-0.3cm}
+\begin{block}{Hierarchical time series}
+An $n$-dimensional multivariate time series such that $\bm{y}_t\in\mathfrak{s}\quad\forall t$.
+\end{block}\vspace*{-0.3cm}
+\begin{block}{Coherent point forecasts}
+$\tilde{\bm{y}}_{t+h|t}$ is \emph{coherent} if $\tilde{\bm{y}}_{t+h|t} \in \mathfrak{s}$.
+\end{block}\vspace*{-0.2cm}
+\end{textblock}
+\only<2-3>{\begin{textblock}{7.5}(.2,6.75)\fontsize{13}{13}\sf
+\begin{alertblock}{Base forecasts}
+Let $\hat{\bm{y}}_{t+h|t}$ be vector of \emph{incoherent} initial $h$-step forecasts.$\phantom{y_{t|h}}$
+\end{alertblock}
+\end{textblock}}
+\only<3>{\begin{textblock}{7.5}(8.3,6.75)\fontsize{13}{13}\sf
+\begin{alertblock}{Reconciled forecasts}
+Let $\psi$ be a mapping, $\psi:\mathbb{\chi}^n\rightarrow\mathfrak{s}$.  $\tilde{\bm{y}}_{t+h|t}=\psi(\hat{\bm{y}}_{t+h|t})$ ``reconciles'' $\hat{\bm{y}}_{t+h|t}$.
+\end{alertblock}
+\end{textblock}}
+
+\placefig{9.4}{.0}{width=6.6cm}{3D_hierarchy}
+\begin{textblock}{3}(11.4,5.6)\fontsize{13}{13}\sf
+\begin{block}{}
+\centerline{$y_{Tot} = y_A + y_B$}
+\end{block}
+\end{textblock}
+
+## Linear projection reconciliation
+\fontsize{14}{16}\sf
+\vspace*{0.2cm}\begin{alertblock}{}
+\centerline{$\tilde{\bm{y}}_{t+h|t}= \psi(\hat{\bm{y}}_{t+h|t}) = \bm{M}\hat{\bm{y}}_{t+h|t}$}
+\end{alertblock}\vspace*{-0.2cm}
+
+* If $\bm{S}$ forms a basis set for $\mathfrak{s}$, then projections are of the form $\bm{M} = \bS(\bS'\bm{\Psi}\bS)^{-1}\bS'\bm{\Psi}$ where $\bm{\Psi}$ is a positive definite matrix.
+* Coherent base forecasts are unchanged since $\bm{M}\hat{\bm{y}}=\hat{\bm{y}}$
+* If $\hat{\bm{y}}$ is unbiased, then $\tilde{\bm{y}}$ is also unbiased.
+* $\bm{W}_h = \var[\by_{T+h} - \hat{\by}_{T+h|T} \mid \by_1,\dots,\by_T]$ is the covariance matrix of the base forecast errors.
+* $\bm{V}_h = \var[\by_{T+h} - \tilde{\by}_{T+h|T}  \mid \by_1,\dots,\by_T])  = \bm{M}\bm{W}_h\bm{M}'$ is the covariance matrix of the reconciled forecast errors.
+* How to choose the best $\bm{\Psi}$?
+
+\vspace*{10cm}
+
+## Minimum trace reconciliation
+
+\begin{textblock}{6.4}(9,-0.1)\begin{block}{}
+Wickramasuriya et al (2019)
+\end{block}\end{textblock}
+
+\vspace*{0.2cm}\begin{alertblock}{Minimum trace (MinT) reconciliation}
+If $\bm{M}$ is a projection, then trace of $\bm{V}_h$ is minimized when $\bm{\Psi} = \bm{W}_h$, so that
+\centerline{$\bm{M} = \bS(\bS'\bm{W}_h^{-1}\bS)^{-1}\bS'\bm{W}_h^{-1}$}
+\end{alertblock}
+\begin{block}{}
+\centerline{$\displaystyle\textcolor{red}{\tilde{\by}_{T+h|T}}
+= \bm{M} ~ \textcolor{blue}{\hat{\by}_{T+h|T}}$}
+\end{block}\vspace*{-0.2cm}
+\centerline{\hspace*{1.4cm}\textcolor{red}{Reconciled forecasts}\hfill\textcolor{blue}{Base forecasts}\hspace*{2.9cm}}\vspace*{-0.2cm}
+
+* Trace of $\bm{V}_h$ is sum of forecast variances.
+* MinT is $L_2$ optimal amongst linear unbiased forecasts.
+* How to estimate $\bm{W}_h = \var[\by_{T+h} - \hat{\by}_{T+h|T} \mid \by_1,\dots,\by_T]$?
+
+## Linear projections
+
+\begin{textblock}{5}(7,-0.2)
+\begin{block}{}
+\centerline{$\tilde{\by}_{T+h|T}=\bS\bG\hat{\by}_{T+h|T}$}
+\end{block}
+\end{textblock}
+
+\begin{textblock}{9.4}(.5,1.2)
+\begin{alertblock}{Reconciliation method \hspace*{0.5cm} $\bG$}
+\begin{tabular}{ll}
+  OLS             & $(\bS'\bS)^{-1}\bS'$ \\
+  WLS(var)        & $(\bS'\bm{\Lambda}_v\bS)^{-1}\bS'\bm{\Lambda}_v$ \\
+  WLS(struct)     & $(\bS'\bm{\Lambda}_s\bS)^{-1}\bS'\bm{\Lambda}_s$ \\
+  MinT(sample)    & $(\bS'\hat{\bm{W}}_{\text{sam}}^{-1}\bS)^{-1}\bS' \hat{\bm{W}}_{\text{sam}}^{-1}$  \\
+  MinT(shrink)\hspace*{2cm}    & $(\bS'\hat{\bm{W}}_{\text{shr}}^{-1}\bS)^{-1}\bS' \hat{\bm{W}}_{\text{shr}}^{-1}$  \\
+\end{tabular}
+\end{alertblock}
+\end{textblock}
+\begin{textblock}{15}(.2,5.7)\fontsize{13}{15}\sf
+\begin{itemize}\parskip=0cm
+\item $\bm{\Lambda}_v = \text{diag}(\bm{W}_1)^{-1}$
+\item $\hat{\bm{W}}_{\text{sam}}$ is sample estimate of the residual covariance matrix
+\item $\hat{\bm{W}}_{\text{shr}}$ is shrinkage estimator $\tau \text{diag}(\hat{\bm{W}}_{\text{sam}})+(1-\tau)\hat{\bm{W}}_{\text{sam}}$\\ where $\tau$ selected optimally.
+\item Still need a good estimate of $\bm{W}_h$ for forecast variance.
+\end{itemize}
+\end{textblock}
+\begin{textblock}{14}(4.5,5.7)\fontsize{13}{15}\sf
+\begin{itemize}\tightlist
+\item $\bm{\Lambda}_s = \text{diag}(\bS\bm{1})^{-1}$
+\end{itemize}
+\end{textblock}
+\begin{textblock}{5}(10.3,3.35)
+\begin{block}{}
+These approximate MinT by assuming $\bm{W}_h = k_h \bm{W}_1$.
+\end{block}
+\end{textblock}
+
+## Example: Australian tourism
+\fontsize{10}{11}\sf
+
+```{r tourismdata00, echo=TRUE}
+tourism
+```
+
+## Example: Australian tourism
+\fontsize{10}{11}\sf
+
+```{r tourismagg, echo=TRUE}
+tourism_agg <- tourism |>
+  aggregate_key(state / zone / region, visitors = sum(visitors))
+```
+
+```{r tourismagg2, echo=FALSE}
+tourism_agg
+```
+
+## Example: Australian tourism
+\fontsize{10}{11}\sf
+
+```{r tourismmodels, echo=TRUE}
+fit <- tourism_agg |>
+  filter(year(month) <= 2015) |>
+  model(ets = ETS(visitors))
+```
+
+```{r tourismmodels1, echo=FALSE}
+fit
+```
+
+## Example: Australian tourism
+\fontsize{10}{11}\sf
+
+```{r fctourism, echo=TRUE}
+fc <- fit |>
+  reconcile(
+    ols = min_trace(ets, method = "ols"),
+    wlsv = min_trace(ets, method = "wls_var"),
+    wlss = min_trace(ets, method = "wls_struct"),
+    # mint_c = min_trace(ets, method="mint_cov"),
+    mint_s = min_trace(ets, method = "mint_shrink"),
+  ) |>
+  forecast(h = "2 years")
+```
+
+```{r fctourism1, echo=FALSE}
+fc
+```
+
+## Example: Australian tourism
+\fontsize{10}{11}\sf
+
+```{r fcaccuracy2, dependson='fctourismcomb', echo=TRUE}
+fc |>
+  accuracy(tourism_agg, measures = list(mase = MASE, rmsse = RMSSE)) |>
+  group_by(.model) |>
+  summarise(mase = mean(mase), rmsse = sqrt(mean(rmsse^2))) |>
+  arrange(rmsse)
+```
+
+\only<2>{\begin{textblock}{7}(7,5)
+\begin{block}{}\fontsize{13}{14}\sf
+\begin{itemize}\tightlist
+\item Overall, every reconciliation method is better than the base ETS forecasts.
+\end{itemize}
+\end{block}
+\end{textblock}}
+
+## Example: Australian tourism
+\fontsize{8}{7}\sf
+
+```{r fcaccuracy3, dependson='fctourismcomb', echo=FALSE}
+fc |>
+  accuracy(tourism_agg,
+    measures = list(mase = MASE, rmsse = RMSSE)
+  ) |>
+  mutate(
+    level = case_when(
+      is_aggregated(state) ~ "National",
+      is_aggregated(zone) ~ "State",
+      is_aggregated(region) ~ "Zone",
+      TRUE ~ "Region"
+    ),
+    level = factor(level, levels = c("National", "State", "Zone", "Region"))
+  ) |>
+  group_by(.model, level) |>
+  summarise(mase = mean(mase), rmsse = sqrt(mean(rmsse^2))) |>
+  arrange(level, rmsse)
+```
+
+\only<2>{\begin{textblock}{7}(7,5)
+\begin{block}{}\fontsize{13}{14}\sf
+\begin{itemize}\tightlist
+\item OLS is best for all levels except national.
+\item Improvements due to reconciliation are greater at lower levels.
+\end{itemize}
+\end{block}
+\end{textblock}}
+
+# Probabilistic forecast reconciliation
+
+## The coherent subspace
+
+\begin{textblock}{9}(.2,1)\fontsize{13}{13}\sf
+\begin{block}{Coherent subspace}
+$m$-dimensional linear subspace $\mathfrak{s}\subset \mathbb{\chi}^n$ for which linear constraints hold for all $\bm{y}\in\mathfrak{s}$.
+\end{block}\vspace*{-0.3cm}
+\begin{block}{Hierarchical time series}
+An $n$-dimensional multivariate time series such that $\bm{y}_t\in\mathfrak{s}\quad\forall t$.
+\end{block}\vspace*{-0.3cm}
+\begin{block}{Coherent point forecasts}
+$\tilde{\bm{y}}_{t+h|t}$ is \emph{coherent} if $\tilde{\bm{y}}_{t+h|t} \in \mathfrak{s}$.
+\end{block}\vspace*{-0.2cm}
+\end{textblock}
+{\begin{textblock}{7.5}(.2,6.75)\fontsize{13}{13}\sf
+\begin{alertblock}{Base forecasts}
+Let $\hat{\bm{y}}_{t+h|t}$ be vector of \emph{incoherent} initial $h$-step forecasts.$\phantom{y_{t|h}}$
+\end{alertblock}
+\end{textblock}}
+{\begin{textblock}{7.5}(8.3,6.75)\fontsize{13}{13}\sf
+\begin{alertblock}{Reconciled forecasts}
+Let $\psi$ be a mapping, $\psi:\mathbb{\chi}^n\rightarrow\mathfrak{s}$.  $\tilde{\bm{y}}_{t+h|t}=\psi(\hat{\bm{y}}_{t+h|t})$ ``reconciles'' $\hat{\bm{y}}_{t+h|t}$.
+\end{alertblock}
+\end{textblock}}
+
+\placefig{9.4}{.0}{width=6.6cm}{3D_hierarchy}
+\begin{textblock}{3}(11.4,5.6)\fontsize{13}{13}\sf
+\begin{block}{}
+\centerline{$ y_{Tot} = y_A + y_B$}
+\end{block}
+\end{textblock}
+
+## Coherent probabilistic forecasts
+\begin{textblock}{9.5}(0.2,1)\fontsize{13}{14}\sf
+\begin{block}{Coherent probabilistic forecasts}
+A probability triple $(\mathfrak{s}, \mathscr{F}_{\mathfrak{s}}, \breve{\nu})$ is coherent with the bottom probability triple $(\mathbb{\chi}^m, \mathscr{F}_{\mathbb{\chi}^m}, \nu)$, if
+\centerline{$\breve{\nu}(s(\mathcal{B})) = \nu(\mathcal{B}) \quad \forall \mathcal{B} \in \mathscr{F}_{\mathbb{\chi}^m}$}
+\end{block}\vspace*{-0.2cm}
+\begin{itemize}\tightlist
+\item Random draws from coherent distribution must lie on $\mathfrak{s}$.
+\item The probability of points not on $\mathfrak{s}$ is zero.
+\item The reconciled distribution is a transformation of the base forecast distribution that is coherent on $\mathfrak{s}$.
+\end{itemize}
+\end{textblock}
+\begin{textblock}{7}(9.5,1.2)
+\resizebox{\textwidth}{!}{
+\input figs/probforerec_schematic.tex
+}
+\end{textblock}
+\begin{textblock}{7}(9.5,7.5)
+\centerline{$\psi = s \circ g$}
+\end{textblock}
+\begin{textblock}{13.2}(0.2,7.9)
+\begin{block}{}\fontsize{12}{12}\sf
+\citet{coherentprob,CorEtAl2022}
+\end{block}
+\end{textblock}
+
+## Simulation from a reconciled distribution
+
+\begin{block}{}
+Suppose that $\left(\hat{\bm{y}}^{[1]},\ldots,\hat{\bm{y}}^{[L]}\right)$ is a sample drawn from an incoherent probability measure $\hat{\nu}$. Then $\left(\tilde{\bm{y}}^{[1]},\ldots,\tilde{\bm{y}}^{[L]}\right)$ where $\tilde{\bm{y}}^{[\ell]}:=\psi(\hat{\bm{y}}^{[\ell]})$ for $\ell=1,\ldots,L$, is a sample drawn from the reconciled probability measure $\tilde{\nu}$.
+\end{block}\vspace*{-0.4cm}
+
+* Simulate future sample paths for each series, by simulating from each model using a multivariate bootstrap of the residuals (to preserve cross-correlations).
+* Reconcile the sample paths.
+* The reconciled sample paths are a sample from the reconciled distribution.
+
+## Simulation from a reconciled distribution
+
+```{r}
+#| label: sim_bootstrap
+#| include: false
+p <- tidyr::expand_grid(
+    time = seq(100),
+    series = seq(20)
+  ) |>
+  mutate(res = rnorm(n())) |>
+  ggplot(aes(x=time, y=series, fill=res)) +
+  geom_tile() +
+  scale_y_continuous(breaks = seq(20), minor_breaks = NULL, expand=c(0,0)) +
+  guides(fill = "none")
+Cairo::CairoPDF(file="figs/sim_bootstrap.pdf", width=8, height=4)
+  print(p)
+crop::dev.off.crop()
+slices <- sample(seq(100), replace = TRUE, size = 20)
+for(i in seq_along(slices)) {
+  Cairo::CairoPDF(file=paste0("figs/sim_bootstrap_", i, ".pdf"), width=8, height=4)
+    print(p +
+      geom_rect(aes(xmin = slices[i], xmax = slices[i]+0.9, ymin = 0.5, ymax = 20.5),
+                 fill = "transparent", col="white"))
+  crop::dev.off.crop()
+}
+```
+
+\vspace*{0.2cm}
+\centerline{\includegraphics[width=15.5cm]{figs/sim_bootstrap.pdf}}
+
+## Simulation from a reconciled distribution
+
+\vspace*{0.2cm}
+\centerline{
+\animategraphics[loop,autoplay,width=15.5cm]{10}{figs/sim_bootstrap_}{1}{20}
+}
+
+
+
+## Wales Health Board Areas
+
+```{r}
+#| label: data
+incident_gthf <- readr::read_rds(here::here("data/incidents_gt.rds"))
+```
+
+\placefig{.2}{1.2}{width=7.8cm}{Map-of-Wales-Health-Boards}
+
+\begin{textblock}{8}(8.5,1.2)
+\begin{block}{Data}
+\begin{itemize}\tightlist
+\item Daily number of attended incidents:\newline 1 October 2015 -- 31 July 2019
+* Disaggregated by:
+  * control area (x3)
+  * health board (x7)
+  * priority (x3)
+  * nature of incidents (x35)
+* `r scales::label_comma()(NROW(incident_gthf))` rows observations from `r scales::label_comma()(NROW(attributes(incident_gthf)$key))` time series.
+\end{itemize}
+\end{block}
+\end{textblock}
+
+## Data structure
+
+```{r}
+#| label: data_structure
+#| include: false
+data <- data.frame(
+  level1 = "Total",
+  level2 = c(
+    "Central & West", "Central & West", "Central & West",
+    "North", "South & East", "South & East", "South & East"
+  ),
+  level3 = c("HD", "AB", "PO", "BC", "CV", "CT", "AB")
+)
+# transform it to a edge list!
+edges_level1_2 <- data |>
+  select(level1, level2) |>
+  unique() |>
+  rename(from = level1, to = level2)
+edges_level2_3 <- data |>
+  select(level2, level3) |>
+  unique() |>
+  rename(from = level2, to = level3)
+Cairo::CairoPDF(here::here("figs/group.pdf"), width = 6, height = 6)
+rbind(edges_level1_2, edges_level2_3) |>
+  igraph::graph_from_data_frame() |>
+  ggraph::ggraph(layout = "dendrogram", circular = FALSE) +
+  ggraph::geom_edge_diagonal() +
+  ggraph::geom_node_point(color = "#dddddd", size = 10) +
+  ggraph::geom_node_text(
+    aes(label = c(
+      "All country",
+      "Central & West", "North", "South & East",
+      "HD", "AB", "PO", "BC", "CV", "CT", "AB"
+    ))
+  ) +
+  theme_void() +
+  theme(
+    # panel.background = element_rect(fill = "transparent"), # transparent panel bg
+    plot.background = element_rect(fill = "transparent"), # transparent plot bg
+  )
+crop::dev.off.crop()
+```
+
+\placefig{0.3}{1.5}{width=7cm}{group.pdf}
+\placefig{7.5}{1.5}{width=7.7cm}{group.png}
+
+## Data
+\fontsize{10}{10}\sf
+
+```{r}
+incident_gthf
+```
+
+## Data
+\fontsize{10}{10}\sf
+
+```{r}
+incident_gthf  |>
+  arrange(date, region, category, nature, lhb)  |>
+  mutate(category = recode(category, RED = "Red", AMB = "Amber", GRE = "Green"))
+```
+
+```{r}
+#| label: time_plots
+gglabs <- ggplot2::labs(x = "Date", y = "Incidents")
+p_total <- incident_gthf |>
+  filter(is_aggregated(region) & is_aggregated(lhb) & is_aggregated(category) & is_aggregated(nature)) |>
+  autoplot(incident) +
+  gglabs
+
+p_control <- incident_gthf |>
+  filter(!is_aggregated(region) & !is_aggregated(lhb) & is_aggregated(category) & is_aggregated(nature)) |>
+  as_tibble() |>
+  select(-nature, -category) |>
+  group_by(date, region) |>
+  summarise(incident = sum(incident), .groups = "drop") |>
+  ggplot(aes(x = date, y = incident, color = factor(region))) +
+  geom_line() +
+  gglabs +
+  labs(color = "Control")
+
+p_board <- incident_gthf |>
+  filter(!is_aggregated(region) & !is_aggregated(lhb) & is_aggregated(category) & is_aggregated(nature)) |>
+  as_tibble() |>
+  select(-nature, -category) |>
+  ggplot(aes(x = date, y = incident, color = factor(lhb))) +
+  geom_line() +
+  gglabs +
+  labs(color = "Health board")
+
+p_priority <- incident_gthf |>
+  filter(is_aggregated(region) & is_aggregated(lhb) & !is_aggregated(category) & is_aggregated(nature)) |>
+  mutate(
+    category = recode(category, RED = "Red", AMB = "Amber", GRE = "Green"),
+    category = factor(category, levels = c("Red", "Amber", "Green"))
+  ) |>
+  as_tibble() |>
+  select(-nature, -region) |>
+  ggplot(aes(x = date, y = incident, color = factor(category))) +
+  geom_line() +
+  scale_color_manual(values = c(Red = "#ff3300", Amber = "#E69f00", Green = "#009e73")) +
+  gglabs +
+  labs(color = "Priority")
+
+p_nature1 <- incident_gthf |>
+  filter(is_aggregated(region) & is_aggregated(lhb) & is_aggregated(category) & !is_aggregated(nature)) |>
+  as_tibble() |>
+  mutate(nature = stringr::str_pad(as.character(nature), width = 12, side = "right")) |>
+  group_by(date, nature, lhb) |>
+  summarise(incident = sum(incident), .groups = "drop") |>
+  ggplot(aes(x = date, y = incident, color = nature)) +
+  geom_line() +
+  gglabs +
+  labs(color = "Nature of incident") +
+  ylim(0,260)
+
+top_cat <- incident_gthf |>
+  as_tibble() |>
+  filter(!is_aggregated(nature)) |>
+  group_by(nature) |>
+  summarise(incident = sum(incident), .groups = "drop") |>
+  arrange(desc(incident)) |>
+  head(3) |>
+  pull(nature) |>
+  as.character()
+selected_nature <- c("CHESTPAIN", "STROKECVA", "BREATHING", "ABDOMINAL")
+p_nature2 <- incident_gthf |>
+  filter(is_aggregated(region) & is_aggregated(lhb) & is_aggregated(category) & !is_aggregated(nature)) |>
+  as_tibble() |>
+  mutate(nature = as.character(nature)) |>
+  filter(nature %in% selected_nature) |>
+  group_by(date, nature, lhb) |>
+  summarise(incident = sum(incident), .groups = "drop") |>
+  ggplot(aes(x = date, y = incident, color = nature)) +
+  geom_line() +
+  gglabs +
+  labs(color = "Nature of incident") +
+  ylim(0,260)
+
+p <- patchwork::align_patches(p_total, p_control, p_board, p_priority, p_nature1, p_nature2)
+```
+
+## Aggregated daily incidents
+
+```{r}
+#| label: time_plots1
+p[[1]]
+```
+
+## Daily incidents by control area
+
+```{r}
+#| label: time_plots2
+p[[2]]
+```
+
+## Data incidents by health board
+
+```{r}
+#| label: time_plots3
+p[[3]]
+```
+
+## Data incidents by priority
+
+```{r}
+#| label: time_plots4
+p[[4]]
+```
+
+## Data incidents by nature of incident
+
+```{r}
+#| label: time_plots5
+p[[5]]
+```
+
+## Data incidents by nature of incident
+
+```{r}
+#| label: time_plots6
+p[[6]]
+```
+
+
+## Forecasting methods
+
+1. **Naïve**: Empirical distribution of past daily attended incidents.
+2. **ETS**: Exponential Smoothing State Space models.
+3. **GLM**: Poission Regression with spline trend, day of the week, annual Fourier seasonality, public holidays, school holidays, Christmas Day, New Year's Day.
+4. **TSGLM**: Poisson Regression with same covariates plus three autoregressive terms.
+5. **Ensemble**: Mixture distribution of 1--4.
+
+## Performance evaluation
+
+* Ten-fold time series cross-validation
+* Forecast horizon of 1--84 days
+* Each training set contains an additional 42 days.
+* Forecasts at 43--84 days correspond to planning horizon.
+
+```{r}
+#| label: cv1
+#| echo: false
+#| fig-height: 2.7
+.lines <- 10
+.init <- 30
+.step <- 6
+h <- 7:12
+max_t <- .init + .step*(.lines - 1) + max(h)
+expand.grid(
+    time = seq(max_t),
+    .id = seq(.lines)
+  ) |>
+  mutate(
+    min_h = (.id-1) * .step + .init + min(h),
+    max_h =  (.id-1) * .step + .init + max(h),
+    observation = case_when(
+      time <= ((.id - 1) * .step + .init) ~ "train",
+      time < min_h ~ "test1",
+      time <= max_h ~ "test2",
+      TRUE ~ "unused"
+    )
+  ) |>
+  ggplot(aes(x = time, y = .id)) +
+  geom_segment(
+    aes(x = 0, xend = max_t+1, y = .id, yend = .id),
+    arrow = arrow(length = unit(0.015, "npc")),
+    col = "black", linewidth = .25
+  ) +
+  geom_point(aes(col = observation), size = 2) +
+  scale_y_reverse() +
+  scale_colour_manual(values = c(train = "#0072B2", test1 = "#d59771", test2 = "#D55E00", unused = "gray")) +
+  theme_void() +
+  guides(colour = "none") +
+  labs(x = "weeks", y = "") +
+  theme_void() +
+  theme(
+    axis.title = element_text(),
+    plot.background = element_rect(fill = "#fafafa", color = "#fafafa")
+  )
+```
+
+```{r}
+#| label: results
+#| include: false
+rmsse <- readr::read_rds(here::here("results/rmsse.rds")) |>
+  mutate(msse = rmsse^2) |>
+	mutate(model = if_else(model == "", "ensemble2", model))
+mase <- readr::read_rds(here::here("results/mase.rds")) |>
+		mutate(model = if_else(model == "", "ensemble2", model))
+crps <- readr::read_rds(here::here("results/crps.rds")) |>
+	mutate(model = if_else(model == "", "ensemble2", model)) |>
+  pivot_wider(names_from = model, values_from = crps) |>
+  group_by(method, h, series) |>
+  mutate(across(where(is.numeric), ~ .x / naiveecdf)) |>
+  ungroup() |>
+  pivot_longer(ensemble2:tscount, names_to = "model", values_to = "crps")
+```
+
+## Forecast accuracy: 43--84 days ahead
+\fontsize{10}{10}\sf
+
+```{r}
+#| label: results_table_msse
+# Set minimum in column to bold
+set_to_bold <- function(table) {
+  for (i in 3:6) {
+    best <- which.min(table[[i]])
+    table[[i]] <- sprintf(table[[i]], fmt = "%1.3f")
+    table[[i]][best] <- cell_spec(table[[i]][best], bold = TRUE)
+  }
+  return(table)
+}
+crps1 <- readr::read_rds(here::here("results/crps.rds")) |>
+  filter(
+    method %in% c("mint", "base"),
+    model != "qcomb", model != "ensemble2",
+    h > 42
+  ) |>
+  mutate(
+    model = factor(model,
+      levels = c("naiveecdf", "ets", "iglm", "tscount", "ensemble"),
+      labels = c("Naïve", "ETS", "GLM", "TSGLM", "Ensemble")
+    ),
+    method = factor(method, levels = c("base", "mint"), labels = c("Base", "MinT"))
+  ) |>
+  group_by(method, model, series) |>
+  summarise(crps = mean(crps), .groups = "drop") |>
+  pivot_wider(names_from = series, values_from = crps) |>
+  select(Method = method, Model = model, Total, `Control areas`, `Health boards`, Bottom) |>
+  set_to_bold()
+kbl(crps1, booktabs = TRUE, escape = FALSE, align = "llrrrr") |>
+  add_header_above(c(" " = 2, "CRPS" = 4)) |>
+  kable_styling(latex_options = c("hold_position"))
+```
+
+## Forecast accuracy
+
+* Ensemble mixture distributions give better forecasts than any component methods.
+* Forecast reconciliation improves forecast accuracy, even when some component methods are quite poor.
+* The ensemble without the Naïve method was worse.
+* Forecast reconciliation allows coordinated planning and resource allocation.
+
+# Cross-temporal probabilistic forecast reconciliation
+
+## Temporal reconciliation: quarterly data
+
+\begin{textblock}{7}(1,1.9)
+\begin{tikzpicture}
+  \tikzstyle{every node}=[ellipse,draw,inner sep=0.2pt,fill=red!15,font=\small]
+  \tikzstyle[level distance=.1cm]
+  \tikzstyle[sibling distance=3cm]
+  \tikzstyle{level 1}=[sibling distance=18mm,set style={{every node}+=[fill=yellow]}]
+  \node{Annual}[edge from parent fork down]
+  child {node {Q$_1$}}
+  child {node {Q$_2$}}
+  child {node {Q$_3$}}
+  child {node {Q$_4$}};
+\end{tikzpicture}
+\end{textblock}
+
+\only<3>{\begin{textblock}{8.5}(8.3,1.1)\fontsize{14}{17}\sf
+$$\bm{y}_\tau =
+  \begin{bmatrix}
+    x_{\tau}^{[4]}  \\[0.2cm]
+    x_{\tau,1}^{[1]} \\[0.2cm]
+    x_{\tau,2}^{[1]} \\[0.2cm]
+    x_{\tau,3}^{[1]} \\[0.2cm]
+    x_{\tau,4}^{[1]}
+  \end{bmatrix}
+  \qquad
+  \bm{S} = \begin{bmatrix}
+    1 & 1 & 1 & 1 \\[0.2cm]
+    1 & 0 & 0 & 0 \\[0.2cm]
+    0 & 1 & 0 & 0 \\[0.2cm]
+    0 & 0 & 1 & 0 \\[0.2cm]
+    0 & 0 & 0 & 1
+  \end{bmatrix}
+$$
+\end{textblock}}
+
+\only<2->{\begin{textblock}{8}(.3,5.7)
+  \begin{alertblock}{}
+    \begin{itemize}
+      \item[\color{white}\ding{229}] Forecast series at each available frequency.
+      \item[\color{white}\ding{229}] Optimally combine forecasts within the same year.
+    \end{itemize}
+  \end{alertblock}
+\end{textblock}}
+
+\only<3->{\begin{textblock}{5}(10.3,7.9)
+\fontsize{11}{12}\sf
+$\tau=$ index of largest temporal aggregation level.
+\end{textblock}}
+
+
+## Temporal reconciliation: quarterly data
+
+\begin{textblock}{7}(0.1,1.9)
+\begin{tikzpicture}
+  \tikzstyle{every node}=[ellipse,draw,inner sep=0.2pt,fill=red!15,font=\small]
+  \tikzstyle[level distance=.1cm]
+  \tikzstyle[sibling distance=3cm]
+  \tikzstyle{level 1}=[sibling distance=42mm,set style={{every node}+=[fill=blue!15]}]
+  \tikzstyle{level 2}=[sibling distance=18mm,set style={{every node}+=[fill=yellow]}]
+  \node{Annual}[edge from parent fork down]
+  child {node {Semi-Annual$_1$}
+      child {node {Q$_1$}}
+      child {node {Q$_2$}}
+    }
+  child {node {Semi-Annual$_2$}
+      child {node {Q$_3$}}
+      child {node {Q$_4$}}
+    };
+\end{tikzpicture}
+\end{textblock}
+
+\begin{textblock}{8.5}(8.3,1.1)\fontsize{14}{17}\sf
+$$\bm{y}_\tau =
+  \begin{bmatrix}
+    x_{\tau}^{[4]}  \\[0.2cm]
+    x_{\tau,1}^{[2]} \\[0.2cm]
+    x_{\tau,2}^{[2]} \\[0.2cm]
+    x_{\tau,1}^{[1]} \\[0.2cm]
+    x_{\tau,2}^{[1]} \\[0.2cm]
+    x_{\tau,3}^{[1]} \\[0.2cm]
+    x_{\tau,4}^{[1]}
+  \end{bmatrix}
+  \qquad
+  \bm{S} = \begin{bmatrix}
+    1 & 1 & 1 & 1 \\[0.2cm]
+    1 & 1 & 0 & 0 \\[0.2cm]
+    0 & 0 & 1 & 1 \\[0.2cm]
+    1 & 0 & 0 & 0 \\[0.2cm]
+    0 & 1 & 0 & 0 \\[0.2cm]
+    0 & 0 & 1 & 0 \\[0.2cm]
+    0 & 0 & 0 & 1
+  \end{bmatrix}
+$$
+\end{textblock}
+
+\begin{textblock}{8}(.3,5.7)
+  \begin{alertblock}{}
+    \begin{itemize}
+      \item[\color{white}\ding{229}] Forecast series at each available frequency.
+      \item[\color{white}\ding{229}] Optimally combine forecasts within the same year.
+    \end{itemize}
+  \end{alertblock}
+\end{textblock}
+
+\begin{textblock}{5}(10.3,7.9)
+\fontsize{11}{12}\sf
+$\tau=$ index of largest temporal aggregation level.
+\end{textblock}
+
+## Temporal reconciliation: monthly data
+
+\only<1>{\begin{tikzpicture}
+  \tikzstyle{every node}=[ellipse,draw,inner sep=0.2pt,fill=red!15,font=\small]
+  \tikzstyle[level distance=.1cm]
+  \tikzstyle[sibling distance=7cm]
+  \tikzstyle{level 1}=[sibling distance=72mm,set style={{every node}+=[fill=blue!15]}]
+  \tikzstyle{level 2}=[sibling distance=36mm,set style={{every node}+=[fill=yellow]}]
+  \tikzstyle{level 3}=[sibling distance=12mm,font=\scriptsize,set style={{every node}+=[fill=green]}]
+  \node{Annual}[edge from parent fork down]
+  child {node {Semi-Annual$_1$}
+      child {node {Q$_1$}
+          child {node {\scriptsize M$_1$}}
+          child {node {\scriptsize M$_2$}}
+          child {node {\scriptsize M$_3$}}
+        }
+      child {node {Q$_2$}
+          child {node {\scriptsize M$_4$}}
+          child {node {\scriptsize M$_5$}}
+          child {node {\scriptsize M$_6$}}
+        }
+    }
+  child {node {Semi-Annual$_2$}
+      child {node {Q$_3$}
+          child {node {\scriptsize M$_7$}}
+          child {node {\scriptsize M$_8$}}
+          child {node {\scriptsize M$_9$}}
+        }
+      child {node {Q$_4$}
+          child {node {\scriptsize M$_{10}$}}
+          child {node {\scriptsize M$_{11}$}}
+          child {node {\scriptsize M$_{12}$}}
+        }
+    };
+\end{tikzpicture}}
+\only<2->{\begin{tikzpicture}
+  \tikzstyle{every node}=[ellipse,draw,inner sep=0.2pt,fill=red!15,font=\small]
+  \tikzstyle[level distance=.1cm]
+  \tikzstyle[sibling distance=7cm]
+  \tikzstyle{level 1}=[sibling distance=48mm,set style={{every node}+=[fill=blue!15]}]
+  \tikzstyle{level 2}=[sibling distance=24mm,set style={{every node}+=[fill=yellow]}]
+  \tikzstyle{level 3}=[sibling distance=12mm,set style={{every node}+=[fill=green]}]
+  \node{Annual}[edge from parent fork down]
+  child {node {FourM$_1$}
+      child {node {BiM$_1$}
+          child {node {\scriptsize M$_1$}}
+          child {node {\scriptsize M$_2$}}
+        }
+      child {node {BiM$_2$}
+          child {node {\scriptsize M$_3$}}
+          child {node {\scriptsize M$_4$}}
+        }
+    }
+  child {node {FourM$_2$}
+      child {node {BiM$_3$}
+          child {node {\scriptsize M$_5$}}
+          child {node {\scriptsize M$_6$}}
+        }
+      child {node {BiM$_4$}
+          child {node {\scriptsize M$_7$}}
+          child {node {\scriptsize M$_8$}}
+        }
+    }
+  child {node {FourM$_3$}
+      child {node {BiM$_5$}
+          child {node {\scriptsize M$_9$}}
+          child {node {\scriptsize M$_{10}$}}
+        }
+      child {node {BiM$_6$}
+          child {node {\scriptsize M$_{11}$}}
+          child {node {\scriptsize M$_{12}$}}
+        }
+    };
+\end{tikzpicture}}\pause
+
+\begin{textblock}{14}(1,6.7)
+  \begin{alertblock}{}
+    \begin{itemize}
+      \item[\color{white}\ding{229}] Forecast series at each available frequency.
+      \item[\color{white}\ding{229}] Optimally combine forecasts within the same year.
+    \end{itemize}
+  \end{alertblock}
+\end{textblock}
+
+## Temporal reconciliation: monthly data
+\fontsize{11}{11}\sf
+
+$$
+  \bm{y}_\tau=\begin{bmatrix}
+    x_{\tau}^{[12]}     \\[0.2cm]
+    \bm{x}_{\tau}^{[6]} \\[0.2cm]
+    \bm{x}_{\tau}^{[4]} \\[0.2cm]
+    \bm{x}_{\tau}^{[3]} \\[0.2cm]
+    \bm{x}_\tau^{[2]}   \\[0.2cm]
+    \bm{x}_\tau^{[1]}
+  \end{bmatrix}
+  \qquad
+  \bm{S} = \begin{bmatrix}
+    1                & 1 & 1 & 1 & 1~~~1~~~1~~~1 & 1 & 1 & 1 & 1 \\
+    1                & 1 & 1 & 1 & 1~~~1~~~0~~~0 & 0 & 0 & 0 & 0 \\
+    0                & 0 & 0 & 0 & 0~~~0~~~1~~~1 & 1 & 1 & 1 & 1 \\
+    1                & 1 & 1 & 1 & 0~~~0~~~0~~~0 & 0 & 0 & 0 & 0 \\
+    0                & 0 & 0 & 0 & 1~~~1~~~1~~~1 & 0 & 0 & 0 & 0 \\
+    0                & 0 & 0 & 0 & 0~~~0~~~0~~~0 & 1 & 1 & 1 & 1 \\
+    1                & 1 & 1 & 0 & 0~~~0~~~0~~~0 & 0 & 0 & 0 & 0 \\
+                     &   &   &   & \vdots        &   &   &   &   \\
+    0                & 0 & 0 & 0 & 0~~~0~~~0~~~0 & 0 & 1 & 1 & 1 \\
+    1                & 1 & 0 & 0 & 0~~~0~~~0~~~0 & 0 & 0 & 0 & 0 \\
+                     &   &   &   & \vdots        &   &   &   &   \\
+    0                & 0 & 0 & 0 & 0~~~0~~~0~~~0 & 0 & 0 & 1 & 1 \\[0.2cm]
+    \phantom{\vdots} &   &   &   & \bm{I}_{12}   &   &   &   &
+  \end{bmatrix}
+$$
+
+## Temporal reconciliation
+\fontsize{14}{15}\sf
+
+For a time series  $y_1,\dots,y_T$, observed at frequency $m$:
+\begin{alertblock}{}\vspace*{-0.1cm}
+$$
+  x_j^{[k]} = \sum_{t = (j-1)k+1}^{jk} y_t\qquad \text{for $j = 1,\dots,\lfloor T/k\rfloor$}
+$$
+\end{alertblock}
+* $k \in \mathcal{K} = \{k_1,\dots,k_p\}$ denote the $p$ factors of $m$ in ascending order, where $k_1=1$ and $k_p=m$
+* $x_j^{[1]} = y_t$
+* A single unique hierarchy is only possible when there are no coprime pairs in $\mathcal{K}$.
+* $M_k=m/k$ is seasonal period of aggregated series.
+
+## Temporal reconciliation
+\fontsize{14}{15}\sf\vspace*{-0.5cm}
+$$\bm{x}_\tau = \bm{S} \bm{x}_\tau^{[1]}, \qquad \bm{S} = \begin{bmatrix}\bm{A}\\\bm{I}\end{bmatrix}$$
+where
+$$
+\bm{x}_\tau = \begin{bmatrix*}[l]
+    {x_\tau^{[k_p]}}\\
+    {\bm{x}_\tau^{[k_{p-1}]}}\\
+    \quad\vdots\\
+    {\bm{x}_\tau^{[k_1]}}\\
+  \end{bmatrix*}\qquad
+  \bm{x}_\tau^{[k]} = \begin{bmatrix*}[l]
+    x_{M_k(\tau-1)+1}^{[k]}\\
+    x_{M_k(\tau-1)+2}^{[k]}\\
+    \quad\vdots\\
+    x_{M_k\tau}^{[k]}
+  \end{bmatrix*}\qquad
+\bm{A} =
+  \begin{bmatrix}
+    \bm{1}'_m                                    \\
+    \bm{I}_{m/k_{p-1}} \otimes \bm{1}'_{k_{p-1}} \\
+    \vdots                                       \\
+    \bm{I}_{m/k_{2}} \otimes \bm{1}'_{k_{2}}     \\
+  \end{bmatrix}
+$$
+$\tau$ is time index for most aggregated series,
+
+$k\in \mathcal{K} = \{k_1,\dots,k_p\}$,\quad $k_1=1$,\quad $k_p=m$,\quad $\tau=1,\dots,T/m$.
+
+
+## Cross-temporal forecast reconciliation
+
+\placefig{7.5}{1.3}{height=7.7cm, width=20cm}{Smatrix}
+
+\begin{textblock}{10}(0,1.2)
+\begin{itemize}\tightlist
+\item $\bm{S}_{cs}=$ structural cross-sectional matrix
+\item $\bm{S}_{te}=$ structural temporal matrix
+\item $\bm{S}_{ct} = \bm{S}_{cs} \otimes \bm{S}_{te}$
+\item $\bm{x}_\tau = \bm{S}_{ct} \bm{b}_\tau$\\[0.2cm]
+\item $\bm{b}_\tau = \begin{bmatrix}
+        {\bm{x}_{1,\tau}^{[1]}} \\
+        \vdots                  \\
+        {\bm{x}_{n,\tau}^{[1]}}
+      \end{bmatrix}.$
+\end{itemize}
+\end{textblock}
+
+##  Cross-temporal probabilistic forecast reconciliation
+
+\alert{Nonparametric bootstrap}\fontsize{14}{16}\sf
+
+* Simulate future sample paths from all models using bootstrapped residuals, then reconcile them to obtain coherent sample paths.
+* Need to generate samples that preserve cross-temporal relationships.
+* Draw residual samples of all series at same time from most temporally aggregated level.
+* Residuals for other levels obtained using the corresponding time indices.
+
+
+##  Cross-temporal probabilistic forecast reconciliation
+\vspace*{-0.2cm}
+
+```{r}
+#| label: bootres
+#| output: asis
+boot_plot <- function(cols = c("green","blue","red","black")) {
+  cat("\\hspace*{-0.8cm}\\begin{tikzpicture}[scale = 0.9, every node/.style={scale=0.9}]\n")
+  cat("\\matrix (e1) [matrix of nodes,ampersand replacement=\\&,row sep=0cm,column sep=0cm, nodes= {rectangle, fill=white, inner sep = 1pt, font = {\\fontsize{7}{6}\\selectfont}, minimum width=1em, minimum height=1em,anchor=center}, label={[xshift = 0.5em]above:{\\footnotesize$\\widehat{\\textbf{E}}^{[1]}$}}]\n")
+  cat("{\n")
+  cat("$T$ \\& ")
+  for(j in cols) {
+    for(i in seq(4)) {
+      cat(paste0("\\pgfuseimage{n",j, "} \\& "))
+    }
+  }
+  cat("\\\\\n")
+  cat("$X$ \\& ")
+  for(j in cols) {
+    for(i in seq(4)) {
+      cat(paste0("\\pgfuseimage{n",j, "} \\& "))
+    }
+  }
+  cat("\\\\\n")
+  cat("$Y$ \\& ")
+  for(j in cols) {
+    for(i in seq(4)){
+      cat(paste0("\\pgfuseimage{n",j, "} \\& "))
+    }
+  }
+  cat("\\\\\n")
+  for(i in seq(16)) {
+    cat(paste("\\& ",i))
+  }
+  cat("\\\\\n")
+  cat("};\n")
+  cat("\\draw[decorate,thick, decoration={brace, mirror, amplitude=5pt,raise=-1pt}] (e1-4-2.south west) -- (e1-4-17.south east) node[midway, font = {\\fontsize{7}{6}\\selectfont}, yshift = -1em]{Quarterly, $t = 1,\\dots,16$};\n")
+  cat("\\matrix (ek) [above= 10mm of e1.north east, anchor=south east, matrix of nodes,ampersand replacement=\\&,row sep=0cm,column sep=0cm, nodes= {rectangle, fill=white, inner sep = 1pt, font = {\\fontsize{7}{6}\\selectfont}, minimum width=1em, minimum height=1em,anchor=center}, label={[xshift = 0.5em]above:{\\footnotesize$\\widehat{\\textbf{E}}^{[2]}$}}]\n")
+  cat("{\n")
+  cat("$T$ \\& ")
+  for(j in cols) {
+    for(i in seq(2)){
+     cat(paste0("\\pgfuseimage{n",j, "} \\& "))
+    }
+  }
+  cat("\\\\\n")
+  cat("$X$ \\& ")
+  for(j in cols) {
+    for(i in seq(2)){
+     cat(paste0("\\pgfuseimage{n",j, "} \\& "))
+    }
+  }
+  cat("\\\\\n")
+  cat("$Y$ \\& ")
+  for(j in cols) {
+    for(i in seq(2)){
+     cat(paste0("\\pgfuseimage{n",j, "} \\& "))
+    }
+  }
+  cat("\\\\\n")
+  for(i in seq(8)) {
+    cat(paste("\\& ",i))
+  }
+  cat("\\\\\n")
+  cat("};\n")
+  cat("\\draw[decorate,thick, decoration={brace, mirror, amplitude=5pt,raise=-1pt}] (ek-4-2.south west) -- (ek-4-9.south east) node[midway, font = {\\fontsize{7}{6}\\selectfont}, yshift = -1em]{Semi-annual, $j = 1,\\dots,8$};\n")
+  cat("\\matrix (em) [above= 10mm of e1.north west, anchor=south west, matrix of nodes,ampersand replacement=\\&,row sep=0cm,column sep=0cm, nodes= {rectangle, fill=white, inner sep = 1pt, font = {\\fontsize{7}{6}\\selectfont}, minimum width=1em, minimum height=1em,anchor=center}, label={[xshift = 0.5em]above:{\\footnotesize$\\widehat{\\textbf{E}}^{[4]}$}}]\n")
+  cat("{\n")
+  cat("$T$ \\& ")
+  for(j in cols) {
+    cat(paste0("\\pgfuseimage{n",j, "}"))
+    if(j != cols[4]) cat("\\& ")
+  }
+  cat("\\\\\n")
+  cat("$X$ \\& ")
+  for(j in cols) {
+    cat(paste0("\\pgfuseimage{n",j, "}"))
+    if(j != cols[4]) cat("\\& ")
+  }
+  cat("\\\\\n")
+  cat("$Y$ \\& ")
+  for(j in cols) {
+    cat(paste0("\\pgfuseimage{n",j, "}"))
+    if(j != cols[4]) cat("\\& ")
+  }
+  cat("\\\\\n")
+  for(i in seq(4)) {
+    cat(paste("\\& ",i))
+  }
+  cat("\\\\\n")
+  cat("};\n")
+  cat("\\draw[decorate,thick, decoration={brace, mirror, amplitude=5pt,raise=-1pt}] (em-4-2.south west) -- (em-4-5.south east) node[midway, font = {\\fontsize{7}{6}\\selectfont}, yshift = -1em]{Annual, $\\tau = 1,\\dots,4$};\n")
+  cat("\\end{tikzpicture}\n\n")
+}
+boot_plot()
+```
+
+\begin{textblock}{1.9}(12.9,5.3)
+\begin{block}{}\centering
+\textcolor[HTML]{7fb97f}{Year 1}\\
+\textcolor[HTML]{7fbcff}{Year 2}\\
+\textcolor[HTML]{e87f7f}{Year 3}\\
+\textcolor[HTML]{7f7f7f}{Year 4}
+\end{block}
+\end{textblock}
+
+\begin{textblock}{1.9}(12.9,1.6)
+\begin{minipage}{1.9cm}
+  \begin{block}{}\centering
+    \begin{tikzpicture}
+      \tikzstyle{every node}=[ellipse,draw,fill=red!15,inner sep=2pt]
+      \tikzstyle[level distance=.3cm]
+      \tikzstyle[sibling distance=12cm]
+      \tikzstyle{level 1}=[sibling distance=10mm,font=\small,set style={{every node}+=[fill=blue!15]}]
+      \node{Total}[edge from parent fork down]
+      child {node {X}
+        }
+      child {node {Y}
+        };
+    \end{tikzpicture}
+  \end{block}
+\end{minipage}
+\end{textblock}
+
+\begin{textblock}{3}(3.5,1.2)\alert{Data}\end{textblock}
+
+
+##  Cross-temporal probabilistic forecast reconciliation
+\vspace*{-0.2cm}
+
+```{r}
+#| label: bootres1
+#| output: asis
+#| dependson: bootres
+boot_plot(c("red","black","green","blue"))
+```
+
+\begin{textblock}{1.9}(12.9,5.3)
+\begin{block}{}\centering
+\textcolor[HTML]{7fb97f}{Year 1}\\
+\textcolor[HTML]{7fbcff}{Year 2}\\
+\textcolor[HTML]{e87f7f}{Year 3}\\
+\textcolor[HTML]{7f7f7f}{Year 4}
+\end{block}
+\end{textblock}
+
+\begin{textblock}{1.9}(12.9,1.6)
+\begin{minipage}{1.9cm}
+  \begin{block}{}\centering
+    \begin{tikzpicture}
+      \tikzstyle{every node}=[ellipse,draw,fill=red!15,inner sep=2pt]
+      \tikzstyle[level distance=.3cm]
+      \tikzstyle[sibling distance=12cm]
+      \tikzstyle{level 1}=[sibling distance=10mm,font=\small,set style={{every node}+=[fill=blue!15]}]
+      \node{Total}[edge from parent fork down]
+      child {node {X}
+        }
+      child {node {Y}
+        };
+    \end{tikzpicture}
+  \end{block}
+\end{minipage}
+\end{textblock}
+
+\begin{textblock}{3}(3.5,1.2)\alert{Bootstrap}\end{textblock}
+
+##  Cross-temporal probabilistic forecast reconciliation
+\vspace*{-0.2cm}
+
+```{r}
+#| label: bootres2
+#| output: asis
+#| dependson: bootres
+boot_plot(c("red","blue","green","blue"))
+```
+
+\begin{textblock}{1.9}(12.9,5.3)
+\begin{block}{}\centering
+\textcolor[HTML]{7fb97f}{Year 1}\\
+\textcolor[HTML]{7fbcff}{Year 2}\\
+\textcolor[HTML]{e87f7f}{Year 3}\\
+\textcolor[HTML]{7f7f7f}{Year 4}
+\end{block}
+\end{textblock}
+
+\begin{textblock}{1.9}(12.9,1.6)
+\begin{minipage}{1.9cm}
+  \begin{block}{}\centering
+    \begin{tikzpicture}
+      \tikzstyle{every node}=[ellipse,draw,fill=red!15,inner sep=2pt]
+      \tikzstyle[level distance=.3cm]
+      \tikzstyle[sibling distance=12cm]
+      \tikzstyle{level 1}=[sibling distance=10mm,font=\small,set style={{every node}+=[fill=blue!15]}]
+      \node{Total}[edge from parent fork down]
+      child {node {X}
+        }
+      child {node {Y}
+        };
+    \end{tikzpicture}
+  \end{block}
+\end{minipage}
+\end{textblock}
+
+\begin{textblock}{3}(3.5,1.2)\alert{Bootstrap}\end{textblock}
+
+\only<2>{\begin{textblock}{8}(3.7,4)
+\begin{alertblock}{}
+The ``year'' can start in any quarter, giving overlapping blocks.
+\end{alertblock}
+\end{textblock}}
+
+## Monthly Australian Tourism Demand
+
+\begin{textblock}{6}(0.2,1.2)
+\centering\fontsize{12}{13}\sf
+\textbf{Geographical division}\\
+\includegraphics[width = 5.5cm, trim= 0 0 180 0, clip=true]{fr_overview_files/figure-beamer/ausmap-1.pdf}\\[-0.4cm]
+\faTimes\\
+\textbf{Purpose of travel}\\
+{\fontsize{11}{12}\sf Holiday, Visiting friends \& relatives, Business, Other}
+\end{textblock}
+
+\begin{textblock}{10}(6.1,1)
+\fontsize{11}{14}\sf\tabcolsep=0.12cm
+\begin{itemize}
+\item \textbf{Grouped ts}\newline (geographical divisions $\times$ purpose of travel)
+
+\begin{tabular}{lccccc}
+\toprule
+  & \textbf{AUS} & \textbf{States} & \textbf{Zones$^\ast$} & \textbf{Regions} & \textbf{Tot}\\
+  \midrule
+  \textbf{geographical} & {\color{newblue}1} & {\color{newblue}7} & {\color{newblue}21} & {\color{newblue}76} & 105 \\
+  \textbf{purpose} & {\color{newblue}4} & {\color{newblue}28} & {\color{newblue}84} & {\color{avocado}304} & 420\\
+  \midrule
+  \textbf{total} & 5 & 35 & 105 & 380 & \textbf{525}\\
+  \bottomrule
+\end{tabular}
+\centerline{{\color{newblue}$n_a = 221$}, {\color{avocado}$n_b = 304$}, and $\textbf{n = 525}$}
+
+\item \textbf{Temporal framework}, frequencies:\\[0.2cm]
+\begin{multicols}{2}
+  \begin{itemize}\tightlist
+  \item Monthly
+  \item Bi-Monthly
+  \item Quarterly
+  \end{itemize}
+  \begin{itemize}\tightlist
+  \item Four-Monthly
+  \item Semi-Annual
+  \item Annual
+  \end{itemize}
+\end{multicols}
+\end{itemize}
+\end{textblock}
+
+## Monthly Australian Tourism Demand
+
+* Monthly data: January 1998 to December 2016
+
+* Time series cross-validation; initial training set 10 years.
+
+* One-month increase in each training set
+
+* For each training set, compute temporally aggregated series for $k \in \{1,2,3,4,6,12\}$, and produce forecasts up to $h_2=6$, $h_3=4$, $h_4=3$, $h_6=2$ and $h_{12}=1$ steps ahead.
+
+* Automatic ETS forecasts on log-transformed data
+
+## Monthly Australian Tourism Demand
+
+\alert{Reconciliation approaches}\fontsize{13}{14}\sf
+
+* Cross-temporal \textbf{\color{newblue}{bottom-up}} and \textbf{\color{newblue}{partly bottom-up}}
+
+  \begin{tabular}{M{0.24\linewidth}|M{0.24\linewidth}|M{0.24\linewidth}}
+  ct$(bu)$ & ct$(shr_{cs}, bu_{te})$ & ct$(wlsv_{te}, bu_{cs})$
+  \end{tabular}
+
+* Optimal forecast reconciliation with \textbf{\color{newblue}{one-step residuals}}
+
+    \begin{tabular}{M{0.24\linewidth}|M{0.24\linewidth}|M{0.24\linewidth}|M{0.24\linewidth}}
+    oct$(ols)$ & oct$(struc)$ & oct$(wlsv)$ & oct$(bdshr)$
+    \end{tabular}
+
+* Optimal forecast reconciliation with \textbf{\color{newblue}{multi-step residuals}}
+
+    \begin{tabular}{M{0.24\linewidth}|M{0.24\linewidth}|M{0.24\linewidth}|M{0.24\linewidth}}
+    oct$_h(hbshr)$ & oct$_h(bshr)$ & oct$_h(hshr)$ & oct$_h(shr)$
+    \end{tabular}
+
+## Monthly Australian tourism data -- CRPS skill scores
+\fontsize{12}{13}\sf\vspace*{0.2cm}
+
+\centerline{\textcolor{red}{Worse than benchmark}\qquad \textbf{Best}}
+
+\centering
+\footnotesize
+\begin{tabular}[t]{lrr}
+& \textbf{$\forall k \in \{12,6,4,3,2,1\}$} & \textbf{$k = 1$}\\
+\midrule
+base                      & \cellcolor{LightOrange!30} {1.000}  & \cellcolor{LightOrange!30} {1.000} \\
+ct$(bu)$                  & \textcolor{red}{1.321}              & \textcolor{red}{1.077} \\
+ct$(shr_{cs}, bu_{te})$   & \textcolor{red}{1.057}              & {0.976} \\
+ct$(wlsv_{te}, bu_{cs})$  & \textcolor{red}{1.062}              & {0.976}\\
+oct$(ols)$                & {0.989}                             & {0.982}\\
+oct$(struc)$              & {0.982}                             & {0.970}\\
+oct$(wlsv)$               & {0.987}                             & {0.952} \\
+oct$(bdshr)$              & {0.975}                             & {\textbf{0.949}} \\
+oct$_h(hbshr)$            & {0.989}                             & {0.982} \\
+oct$_h(bshr)$             & {0.994}                             & {0.988}\\
+oct$_h(hshr)$             & {\textbf{0.969}}                    & {0.953}\\
+oct$_h(shr)$              & \textcolor{red}{1.007}              & \textcolor{red}{1.000}
+\end{tabular}
+
+# Final comments
+
+## Software
+\fontsize{11}{12}\sf\vspace*{0.3cm}
+
+\hspace*{-0.6cm}\begin{tabular}{llP{1.7cm}cP{1.7cm}c}
+\toprule
+Package                                                                      & Language  & Cross-sectional  & Temporal    & Cross-temporal  & Probabilistic\\
+\midrule
+\texttt{\href{https://pkg.earo.me/hts/}{hts}}
+    & R         & \checkmark       &             &                 & \\
+\texttt{\href{http://pkg.robjhyndman.com/thief/}{thief}}
+    & R         &                  & \checkmark  &                 & \\
+\texttt{\href{https://fable.tidyverts.org}{fable}}
+    & R         & \checkmark       &             &                 & \checkmark\\
+\texttt{\href{https://danigiro.github.io/FoReco/}{FoReco}}
+    & R         & \checkmark       & \checkmark  & \checkmark      & \checkmark\\
+\texttt{\href{https://angelpone.github.io/pyhts/}{pyhts}}
+    & Python    & \checkmark       & \checkmark  &                 & \\
+\texttt{\href{https://nixtla.github.io/hierarchicalforecast/}{hierarchicalforecast}}
+    & Python    & \checkmark       &             &                 & \checkmark \\
+\bottomrule
+\end{tabular}
+
+* `hts`, `thief`, and `FoReco` use `ts` objects
+* `fable` uses `tsibble` objects
+* `fable` has plans to implement temporal and cross-temporal reconciliation
+
+## Thanks!
+
+\placefig{0}{1.2}{trim = 10 45 0 0, clip=TRUE, width=10cm, height=2.5cm}{roman}
+\placefig{2}{1.2}{trim = 0 40 0 0, clip=TRUE, width=10cm, height=2.5cm}{george}
+\placefig{4}{1.2}{trim = 0 10 0 0, clip=TRUE, width=10cm, height=2.5cm}{hanlin}
+\placefig{6}{1.2}{trim = 10 0 0 0, clip=TRUE, width=10cm, height=2.5cm}{earowang}
+\placefig{8}{1.2}{trim = 0 15 0 0, clip=TRUE, width=10cm, height=2.5cm}{alanlee}
+\placefig{10}{1.2}{trim = 30 0 0 0, clip=TRUE, width=10cm, height=2.5cm}{mitch}
+\placefig{12}{1.2}{trim = 15 0 0 0, clip=TRUE, width=10cm, height=2.5cm}{shanika}
+\placefig{14}{1.2}{trim = 40 0 0 0, clip=TRUE, width=10cm, height=2.5cm}{tas}
+
+\placefig{0}{3.8}{trim = 30 10 30 0, clip=TRUE, width=10cm, height=2.5cm}{puwasala}
+\placefig{2}{3.8}{trim = 0 10 0 0, clip=TRUE, width=10cm, height=2.5cm}{fotios}
+\placefig{4}{3.8}{trim = 100 30 50 20, clip=TRUE, width=10cm, height=2.5cm}{nikos}
+\placefig{6}{3.8}{trim = 50 30 0 0, clip=TRUE, width=10cm, height=2.5cm}{souhaib}
+\placefig{8}{3.8}{trim = 110 40 50 0, clip=TRUE, width=10cm, height=2.5cm}{james}
+\placefig{10}{3.8}{trim = 40 40 0 0, clip=TRUE, width=10cm, height=2.5cm}{mahdi}
+\placefig{12}{3.8}{trim = 50 50 0 0, clip=TRUE, width=10cm, height=2.5cm}{christoph}
+\placefig{14}{3.8}{trim = 50 50 0 20, clip=TRUE, width=10cm, height=2.5cm}{fin}
+
+\placefig{0}{6.4}{trim = 10 0 0 0, clip=TRUE, width=10cm, height=2.5cm}{berwin}
+\placefig{2}{6.4}{trim = 10 20 0 0, clip=TRUE, width=10cm, height=2.5cm}{galit}
+\placefig{4}{6.4}{trim = 10 0 0 0, clip=TRUE, width=10cm, height=2.5cm}{mahsa}
+\placefig{6}{6.4}{trim = 30 0 0 0, clip=TRUE, width=10cm, height=2.5cm}{evan}
+\placefig{8}{6.4}{trim = 5 25 0 0, clip=TRUE, width=10cm, height=2.5cm}{bahman}
+\placefig{10}{6.4}{trim = 0 40 0 0, clip=TRUE, width=10cm, height=2.5cm}{pablo}
+\placefig{12}{6.4}{trim = 0 40 0 0, clip=TRUE, width=10cm, height=2.5cm}{danielegiro}
+\placefig{14}{6.4}{trim = 0 0 0 30, clip=TRUE, width=10cm, height=2.5cm}{tommy}
+
+## More information
+\fontsize{18}{20}\sf
+
+\href{https://robjhyndman.com}{\faicon{home} robjhyndman.com}
+
+\href{https://aus.social/@robjhyndman}{\includegraphics[width=0.5cm]{figs/mastodon}\, aus.social/@robjhyndman}
+
+\href{https://github.com/robjhyndman}{\faicon{github}  @robjhyndman}
+
+\href{mailto:rob.hyndman@monash.edu}{\faicon{envelope}  rob.hyndman@monash.edu}
+
+\nocite{hierarchical,fasthts, mint, hfreview, htsgeometry}
+\nocite{Di_FonGir2022a,temporal-hierarchies,ctprob}

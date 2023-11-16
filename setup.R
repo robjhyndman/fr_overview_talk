@@ -1,5 +1,7 @@
 
 library(fpp3)
+library(knitr)
+library(kableExtra)
 library(patchwork)
 
 # Set some defaults
