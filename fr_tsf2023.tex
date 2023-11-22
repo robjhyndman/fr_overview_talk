@@ -330,7 +330,7 @@ notation}\label{hierarchical-time-series-notation}
 
 \begin{frame}{Australian tourism regions}
 \phantomsection\label{australian-tourism-regions}
-\includegraphics{fr_tsf2023_files/figure-beamer/ausmap-1.pdf}
+\placefig{0.1}{1.2}{height=7.8cm, width=16cm}{aus_map}
 
 \begin{textblock}{6.5}(9.1,1.4)
 \begin{block}{}%\fontsize{12}{13}\sf
@@ -991,16 +991,18 @@ Suppose that $\left(\hat{\bm{y}}^{[1]},\ldots,\hat{\bm{y}}^{[L]}\right)$ is a sa
 \phantomsection\label{wales-health-board-areas}
 \placefig{.2}{1.2}{width=7.8cm}{Map-of-Wales-Health-Boards}
 
-\begin{textblock}{8}(8.5,1.2)
+\begin{textblock}{7.3}(8.5,1.2)\fontsize{13}{14}\sf
 \begin{block}{Data}
 \begin{itemize}\tightlist
 \item Daily number of attended incidents:\newline 1 October 2015 -- 31 July 2019
-* Disaggregated by:
-  * control area (x3)
-  * health board (x7)
-  * priority (x3)
-  * nature of incidents (x35)
-* 2,142,000 rows observations from 1,530 time series.
+\item Disaggregated by:
+\begin{itemize}\tightlist
+\item control area (x3)
+\item health board (x7)
+\item priority (x3)
+\item nature of incidents (x35)
+\end{itemize}
+\item  2,142,000 rows observations from 1,530 time series.
 \end{itemize}
 \end{block}
 \end{textblock}

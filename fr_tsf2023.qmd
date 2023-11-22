@@ -41,7 +41,9 @@ source("setup.R")
 
 ```{r}
 #| label: ausmap
-#| fig-height: 3
+#| fig-height: 4
+#| fig-width: 10
+#| eval: false
 library(sf)
 # Use Okabe-Ito color-blind friendly color palette
 state_colors <- c(
@@ -62,6 +64,8 @@ read_sf("tourism/Tourism_Regions_2020.shp") |>
   theme(text = ggplot2::element_text(family = 'Fira Sans')) +
   scale_fill_manual(values = state_colors)
 ```
+
+\placefig{0.1}{1.2}{height=7.8cm, width=16cm}{aus_map}
 
 \begin{textblock}{6.5}(9.1,1.4)
 \begin{block}{}%\fontsize{12}{13}\sf
@@ -618,16 +622,18 @@ incident_gthf <- readr::read_rds(here::here("data/incidents_gt.rds"))
 
 \placefig{.2}{1.2}{width=7.8cm}{Map-of-Wales-Health-Boards}
 
-\begin{textblock}{8}(8.5,1.2)
+\begin{textblock}{7.3}(8.5,1.2)\fontsize{13}{14}\sf
 \begin{block}{Data}
 \begin{itemize}\tightlist
 \item Daily number of attended incidents:\newline 1 October 2015 -- 31 July 2019
-* Disaggregated by:
-  * control area (x3)
-  * health board (x7)
-  * priority (x3)
-  * nature of incidents (x35)
-* `r scales::label_comma()(NROW(incident_gthf))` rows observations from `r scales::label_comma()(NROW(attributes(incident_gthf)$key))` time series.
+\item Disaggregated by:
+\begin{itemize}\tightlist
+\item control area (x3)
+\item health board (x7)
+\item priority (x3)
+\item nature of incidents (x35)
+\end{itemize}
+\item  `r scales::label_comma()(NROW(incident_gthf))` rows observations from `r scales::label_comma()(NROW(attributes(incident_gthf)$key))` time series.
 \end{itemize}
 \end{block}
 \end{textblock}
