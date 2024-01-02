@@ -1,4 +1,3 @@
-
 library(fpp3)
 library(knitr)
 library(kableExtra)
@@ -30,7 +29,6 @@ ggplot2::theme_set(
 quartzFonts(
   sans = c("Fira Sans Regular", "Fira Sans Bold", "Fira Sans Italic", "Fira Sans Bold Italic")
 )
-
 
 # Monthly hierarchical tourism data (state/zone/region)
 # Read csv file of monthly data
@@ -96,3 +94,147 @@ tourism <- hts::hts(
     )
   ) |>
   select(month, everything())
+
+
+# Monthly hierarchical tourism data (state/zone/region/purpose)
+load(here::here("tourism/VN525.RData"))
+tourism <- VNdata[,222:NCOL(VNdata)] |>
+  hts::gts(characters = list(c(1,1,1),3)) |>
+  magrittr::extract2("bts") |>
+  as_tsibble() |>
+  mutate(
+    state = substr(key, 1, 1),
+    zone = substr(key, 1, 2),
+    region = substr(key, 1, 3),
+    purpose = substr(key, 4, 6),
+  ) |>
+  rename(
+    month = index,
+    visitors = value
+  ) |>
+  mutate(
+    state = recode(state,
+                   A = "NSW",
+                   B = "VIC",
+                   C = "QLD",
+                   D = "SA",
+                   E = "WA",
+                   F = "TAS",
+                   G = "NT"
+    ),
+    zone = recode(zone,
+                  AA = "Metro NSW",
+                  AB = "North Coast NSW",
+                  AC = "South Coast NSW",
+                  AD = "South NSW",
+                  AE = "North NSW",
+                  AF = "ACT",
+                  BA = "Metro VIC",
+                  BB = "West Coast VIC",
+                  BC = "East Coast VIC",
+                  BC = "North East VIC",
+                  BD = "North West VIC",
+                  CA = "Metro QLD",
+                  CB = "Central Coast QLD",
+                  CC = "North Coast QLD",
+                  CD = "Inland QLD",
+                  DA = "Metro SA",
+                  DB = "South Coast SA",
+                  DC = "Inland SA",
+                  DD = "West Coast SA",
+                  EA = "West Coast WA",
+                  EB = "North WA",
+                  EC = "South WA",
+                  FA = "South TAS",
+                  FB = "North East TAS",
+                  FC = "North West TAS",
+                  GA = "North Coast NT",
+                  GB = "Central NT"
+    ),
+    region = recode(region,
+                    AAA = "Sydney",
+                    AAB = "Central Coast",
+                    ABA = "Hunter",
+                    ABB = "North Coast NSW",
+                    ACA = "South Coast",
+                    ADA = "Snowy Mountains",
+                    ADB = "Capital Country",
+                    ADC = "The Murray",
+                    ADD = "Riverina",
+                    AEA = "Central NSW",
+                    AEB = "New England North West",
+                    AEC = "Outback NSW",
+                    AED = "Blue Mountains",
+                    AFA = "Canberra",
+                    BAA = "Melbourne",
+                    BAB = "Peninsula",
+                    BAC = "Geelong",
+                    BBA = "Western",
+                    BCA = "Lakes",
+                    BCB = "Gippsland",
+                    BCC = "Phillip Island",
+                    BDA = "Central Murray",
+                    BDB = "Goulburn",
+                    BDC = "High Country",
+                    BDD = "Melbourne East",
+                    BDE = "Upper Yarra",
+                    BDF = "Murray East",
+                    BEA = "Mallee",
+                    BEB = "Wimmera",
+                    BEC = "Western Grampians",
+                    BED = "Bendigo Loddon",
+                    BEE = "Macedon",
+                    BEF = "Spa Country",
+                    BEG = "Ballarat",
+                    BFA = "Central Highlands",
+                    CAA = "Gold Coast",
+                    CAB = "Brisbane",
+                    CAC = "Sunshine Coast",
+                    CBA = "Central Queensland",
+                    CBB = "Bundaberg",
+                    CBC = "Fraser Coast",
+                    CBD = "Mackay",
+                    CCA = "Whitsundays",
+                    CCB = "Northern",
+                    CCC = "Tropical North Queensland",
+                    CDA = "Darling Downs",
+                    CDB = "Outback",
+                    DAA = "Adelaide",
+                    DAB = "Barossa",
+                    DAC = "Adelaide Hills",
+                    DBA = "Limestone Coast",
+                    DBB = "Fleurieu Peninsula",
+                    DBC = "Kangaroo Island",
+                    DCA = "Murraylands",
+                    DCB = "Riverland",
+                    DCC = "Clare Valley",
+                    DCD = "Flinders Range and Outback",
+                    DDA = "Eyre Peninsula",
+                    DDB = "Yorke Peninsula",
+                    EAA = "Australia’s Coral Coast",
+                    EAB = "Experience Perth",
+                    EAC = "Australia’s SouthWest",
+                    EBA = "Australia’s North West",
+                    ECA = "Australia’s Golden Outback",
+                    FAA = "Hobart and the South",
+                    FBA = "East Coast",
+                    FBB = "Launceston, Tamar and the North",
+                    FCA = "North West",
+                    FCB = "Wilderness West",
+                    GAA = "Darwin",
+                    GAB = "Kakadu Arnhem",
+                    GAC = "Katherine Daly",
+                    GBA = "Barkly",
+                    GBB = "Lasseter",
+                    GBC = "Alice Springs",
+                    GBD = "MacDonnell"
+    ),
+    purpose = recode(purpose,
+                     Hol = "Holidays",
+                     Vis = "Visiting Friends and Relatives",
+                     Bus = "Business",
+                     Oth = "Other"
+    )
+  ) |>
+  as_tsibble(index = month, key = c(state, zone, region, purpose)) |>
+  select(month, state:purpose, visitors)
