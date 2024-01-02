@@ -33,21 +33,70 @@ source("setup.R")
 ```
 
 ## Forthcoming paper
-
 \placefig{0}{1.1}{height=8.3cm, width=20cm}{IJFcover}
 
-\begin{textblock}{9.2}(6.3, 1.2)\fontsize{13}{14}\sf
-\begin{itemize}\parskip=0.1cm
-\item Athanasopoulos, Hyndman, Kourentzes, Panagiotelis (2024)
-\emph{International~Journal~of~Forecasting},
-``Forecast reconciliation: A review''.
-\item Preprint at \texttt{\href{https://robjhyndman.com/frreview}{robjhyndman.com/frreview}}
-\end{itemize}
+\begin{textblock}{9}(6.6,1.2)\fontsize{14}{15}\sf
+\begin{refsection}
+\nocite{hfreview}
+\printbibliography[heading=none]
+\end{refsection}
 \end{textblock}
 
 \placefig{6.07}{5.}{trim = 0 40 0 0, clip=TRUE, width=10cm, height=4.1cm}{george}
 \placefig{9.4}{5.}{trim = 0 40 0 0, clip=TRUE, width=10cm, height=4.1cm}{nikos}
 \placefig{12.7}{5.}{trim = 0 0 0 0, clip=TRUE, width=10cm, height=4.1cm}{tas}
+
+## Forecast reconciliation research
+
+```{r}
+#| label: gs_searches
+#| fig-width: 8
+#| fig-height: 4
+# Time series of Google Scholar papers on "hierarchical forecasting" and "forecast reconciliation"
+# example: https://scholar.google.com/scholar?q=%22forecast+reconciliation%22&hl=en&as_sdt=1%2C5&as_ylo=2020&as_yhi=2020
+# Google scholar won't let this be automated as repeated calls using rvest generates a 429 error.
+gspapers <- bind_rows(
+  tibble(
+    year = 1980:2023,
+    count = c(
+      1, 0, 0, 1, 3, 2, 0, 1, 2, 2, # 1980s
+      0, 2, 2, 1, 0, 1, 2, 1, 1, 1, # 1990s
+      1, 5, 4, 3, 5, 8, 14, 14, 39, 38, # 2000s
+      19, 17, 24, 36, 43, 38, 44, 71, 72, 112, # 2010s
+      119,156,180,231
+    ),
+    search = "Hierarchical forecasting"
+  ),
+  tibble(
+    year = 1980:2023,
+    count = c(
+      0, 0, 0, 0, 0, 0, 1, 0, 1, 0, # 1980s
+      0, 0, 0, 0, 2, 2, 1, 1, 3, 1, # 1990s
+      2, 3, 1, 3, 2, 3, 2, 0, 3, 1, # 2000s
+      4, 4, 4, 6, 4, 6, 11, 15, 24, 36, # 2010s
+      50,100,116,136
+    ),
+    search = "Forecast reconciliation"
+  )
+)
+gspapers |>
+  mutate(
+    search = factor(search, levels = c(
+      "Hierarchical forecasting",
+      "Forecast reconciliation"
+    ))
+  ) |>
+  as_tsibble(index = year, key = search) |>
+  filter(year >= 1990) |>
+  autoplot(count, lwd = 1) +
+  ggtitle("Google Scholar items by year") +
+  labs(x = "Year") +
+  guides(colour = guide_legend(title = "Search term")) +
+  scale_color_manual(values = c(
+    `Forecast reconciliation` = "#d95f02",
+    `Hierarchical forecasting` = "#7570b3"
+  ))
+```
 
 ## Outline
 
@@ -336,7 +385,7 @@ $t$.
 \alert{Solution}
 
 * We model and forecast all series independently.
-* We "reconcile" the forecasts to make them coherent.
+* We adjust (or "reconcile") the forecasts to make them coherent.
 
 
 ## The coherent subspace
@@ -391,67 +440,28 @@ Let $\bm{M}$ be a projection matrix. $\tilde{\bm{y}}_{t+h|t}=\bm{M}\hat{\bm{y}}_
 Wickramasuriya et al (2019)
 \end{block}\end{textblock}
 
-\vspace*{0.2cm}\begin{alertblock}{Minimum trace (MinT) reconciliation}
-If $\bm{M}$ is a projection, then trace of $\bm{V}_h$ is minimized when $\bm{\Psi} = \bm{W}_h$, so that
+\vspace*{0.05cm}\begin{alertblock}{Minimum trace (MinT) reconciliation}
+If $\bm{M}$ is a projection, then trace of $\bm{V}_h$ is minimized when $\bm{\Psi} = \bm{W}_h$, so that\vspace*{-0.4cm}
 \centerline{$\bm{M} = \bS(\bS'\bm{W}_h^{-1}\bS)^{-1}\bS'\bm{W}_h^{-1}$}
-\end{alertblock}
+\end{alertblock}\vspace*{-0.05cm}
 \begin{block}{}
 \centerline{$\displaystyle\textcolor{red}{\tilde{\by}_{T+h|T}}
 = \bm{M} ~ \textcolor{blue}{\hat{\by}_{T+h|T}}$}
-\end{block}\vspace*{-0.2cm}
+\end{block}\vspace*{-0.25cm}
 \centerline{\hspace*{1.4cm}\textcolor{red}{Reconciled forecasts}\hfill\textcolor{blue}{Base forecasts}\hspace*{2.9cm}}\vspace*{-0.2cm}
 
+* $\bm{S}$ is the structural matrix, defining linear constraints.
+* $\bm{W}_h = \var[\by_{T+h} - \hat{\by}_{T+h|T} \mid \by_1,\dots,\by_T]$
 * Trace of $\bm{V}_h$ is sum of forecast variances.
 * MinT is $L_2$ optimal amongst linear unbiased forecasts.
-* How to estimate $\bm{W}_h = \var[\by_{T+h} - \hat{\by}_{T+h|T} \mid \by_1,\dots,\by_T]$?
-
-## Linear projections
-
-\begin{textblock}{5}(7,-0.2)
-\begin{block}{}
-\centerline{$\tilde{\by}_{T+h|T}=\bm{M}\hat{\by}_{T+h|T}$}
-\end{block}
-\end{textblock}
-
-\begin{textblock}{9.4}(.5,1.2)
-\begin{alertblock}{Reconciliation method \hspace*{0.5cm} $\bm{M}$}
-\begin{tabular}{l@{\hspace*{-0.5cm}}l}
-  OLS             & $\bS(\bS'\bS)^{-1}\bS'$ \\
-  WLS(var)        & $\bS(\bS'\bm{\Lambda}_v\bS)^{-1}\bS'\bm{\Lambda}_v$ \\
-  WLS(struct)     & $\bS(\bS'\bm{\Lambda}_s\bS)^{-1}\bS'\bm{\Lambda}_s$ \\
-  MinT(sample)    & $\bS(\bS'\hat{\bm{W}}_{\text{sam}}^{-1}\bS)^{-1}\bS' \hat{\bm{W}}_{\text{sam}}^{-1}$  \\
-  MinT(shrink)\hspace*{2cm}    & $(\bS'\hat{\bm{W}}_{\text{shr}}^{-1}\bS)^{-1}\bS' \hat{\bm{W}}_{\text{shr}}^{-1}$  \\
-\end{tabular}
-\end{alertblock}
-\end{textblock}
-\begin{textblock}{15}(.2,5.7)\fontsize{13}{15}\sf
-\begin{itemize}\parskip=0cm
-\item $\bm{\Lambda}_v = \text{diag}(\bm{W}_1)^{-1}$
-\item $\hat{\bm{W}}_{\text{sam}}$ is sample estimate of the residual covariance matrix
-\item $\hat{\bm{W}}_{\text{shr}}$ is shrinkage estimator $\tau \text{diag}(\hat{\bm{W}}_{\text{sam}})+(1-\tau)\hat{\bm{W}}_{\text{sam}}$\\ where $\tau$ selected optimally.
-\item Still need a good estimate of $\bm{W}_h$ for forecast variance.
-\end{itemize}
-\end{textblock}
-\begin{textblock}{14}(4.5,5.7)\fontsize{13}{15}\sf
-\begin{itemize}\tightlist
-\item $\bm{\Lambda}_s = \text{diag}(\bS\bm{1})^{-1}$
-\end{itemize}
-\end{textblock}
-\begin{textblock}{5}(10.3,3.35)
-\begin{block}{}
-These approximate MinT by assuming $\bm{W}_h = k_h \bm{W}_1$.
-\end{block}
-\end{textblock}
+* Approximate $\bm{W}_h \approx k_h \bm{W}_1$, then use shrinkage estimator.
 
 ## Key papers
 \fontsize{12}{12}\sf\vspace*{-0.15cm}
-\begin{itemize}\tightlist
-\item \fullcite{hierarchical}
-\item \fullcite{fasthts}
-\item \fullcite{mint}
-\item \fullcite{htsgeometry}
-\item \fullcite{Di_FonGir2022b}
-\end{itemize}
+\begin{refsection}
+\nocite{hierarchical,fasthts,mint,htsgeometry,Di_FonGir2022b}
+\printbibliography[heading=none]
+\end{refsection}
 
 ## Example: Australian tourism
 \fontsize{10}{11}\sf
@@ -502,7 +512,7 @@ fc
 ```
 
 ## Example: Australian tourism
-\fontsize{9}{10}\sf
+\fontsize{10}{10}\sf
 
 ```{r fcaccuracy2, echo=TRUE}
 #| dependson: fctourism
@@ -513,16 +523,16 @@ fc |>
   arrange(rmsse)
 ```
 
-\only<2>{\begin{textblock}{7}(7,4)
+\begin{textblock}{7}(7,4)
 \begin{block}{}\fontsize{13}{14}\sf
 \begin{itemize}\tightlist
 \item Overall, MinT reconciliation forecasts are better than the base ETS forecasts.
 \end{itemize}
 \end{block}
-\end{textblock}}
+\end{textblock}
 
 ## Example: Australian tourism
-\fontsize{9}{10}\sf
+\fontsize{10}{10}\sf
 
 ```r
 fc |>
@@ -531,6 +541,8 @@ fc |>
   summarise(mase = mean(mase), rmsse = sqrt(mean(rmsse^2))) |>
   arrange(level, rmsse)
 ```
+
+\fontsize{9}{10}\sf
 
 \vspace*{-0.3cm}
 
@@ -553,23 +565,23 @@ fc |>
   ) |>
   group_by(.model, level) |>
   summarise(mase = mean(mase), rmsse = sqrt(mean(rmsse^2))) |>
-  arrange(level, rmsse) |> 
+  arrange(level, rmsse) |>
   filter(level != "Other")
 ```
 
-\only<2>{\begin{textblock}{7}(7,4)
+\begin{textblock}{7}(7,4)
 \begin{block}{}\fontsize{13}{14}\sf
 \begin{itemize}\tightlist
 \item Overall, MinT reconciliation forecasts are better than the base ETS forecasts.
 \item MinT reconciliation forecasts are better than the base ETS forecasts at all levels except national.
 \end{itemize}
 \end{block}
-\end{textblock}}
+\end{textblock}
 
 # Probabilistic forecast reconciliation
 
 ## Coherent probabilistic forecasts
-\begin{textblock}{9.5}(0.2,1)\fontsize{13}{14}\sf
+\begin{textblock}{9.4}(0.5,1.2)\fontsize{13}{14}\sf
 \begin{block}{Coherent probabilistic forecasts}
 A probability triple $(\mathfrak{s}, \mathscr{F}_{\mathfrak{s}}, \breve{\nu})$ is coherent with the bottom probability triple $(\mathbb{\chi}^m, \mathscr{F}_{\mathbb{\chi}^m}, \nu)$, if
 \centerline{$\breve{\nu}(s(\mathcal{B})) = \nu(\mathcal{B}) \quad \forall \mathcal{B} \in \mathscr{F}_{\mathbb{\chi}^m}$}
@@ -638,9 +650,11 @@ for(i in seq_along(slices)) {
 
 ## Key papers
 
-* \fullcite{coherentprob}
-* \fullcite{CorEtAl2022}
-
+\fontsize{12}{12}\sf\vspace*{-0.15cm}
+\begin{refsection}
+\nocite{coherentprob,CorEtAl2022}
+\printbibliography[heading=none]
+\end{refsection}
 
 # Cross-temporal probabilistic forecast reconciliation
 
@@ -780,39 +794,21 @@ for(i in seq_along(slices)) {
 
 * Automatic ETS forecasts on log-transformed data
 
-## Monthly Australian Tourism Demand
-
-\alert{Reconciliation approaches}\fontsize{13}{14}\sf
-
-* Cross-temporal \textbf{\color{newblue}{bottom-up}} and \textbf{\color{newblue}{partly bottom-up}}
-
-  \begin{tabular}{M{0.24\linewidth}|M{0.24\linewidth}|M{0.24\linewidth}}
-  ct$(bu)$ & ct$(shr_{cs}, bu_{te})$ & ct$(wlsv_{te}, bu_{cs})$
-  \end{tabular}
-
-* Optimal forecast reconciliation with \textbf{\color{newblue}{one-step residuals}}
-
-    \begin{tabular}{M{0.24\linewidth}|M{0.24\linewidth}|M{0.24\linewidth}|M{0.24\linewidth}}
-    oct$(ols)$ & oct$(struc)$ & oct$(wlsv)$ & oct$(bdshr)$
-    \end{tabular}
-
-* Optimal forecast reconciliation with \textbf{\color{newblue}{multi-step residuals}}
-
-    \begin{tabular}{M{0.24\linewidth}|M{0.24\linewidth}|M{0.24\linewidth}|M{0.24\linewidth}}
-    oct$_h(hbshr)$ & oct$_h(bshr)$ & oct$_h(hshr)$ & oct$_h(shr)$
-    \end{tabular}
-
 ## Monthly Australian tourism data -- CRPS skill scores
 \fontsize{12}{13}\sf\vspace*{0.2cm}
 
-\centerline{\textcolor{red}{Worse than benchmark}\qquad \textbf{Best}}
+\begin{textblock}{4.5}(2.5,4.2)
+Reconciliation using different covariance matrix ($\bm{W}_h$) estimates
+\end{textblock}
 
-\centering
-\footnotesize
-\begin{tabular}[t]{lrr}
+\rightline{\textcolor{red}{Worse than benchmark}\qquad \textbf{Best}}
+
+\rightline{\footnotesize
+\begin{tabular}[t]{@{}lrr@{}}
 & \textbf{$\forall k \in \{12,6,4,3,2,1\}$} & \textbf{$k = 1$}\\
 \midrule
 base                      & \cellcolor{LightOrange!30} {1.000}  & \cellcolor{LightOrange!30} {1.000} \\
+\midrule
 ct$(bu)$                  & \textcolor{red}{1.321}              & \textcolor{red}{1.077} \\
 ct$(shr_{cs}, bu_{te})$   & \textcolor{red}{1.057}              & {0.976} \\
 ct$(wlsv_{te}, bu_{cs})$  & \textcolor{red}{1.062}              & {0.976}\\
@@ -824,16 +820,17 @@ oct$_h(hbshr)$            & {0.989}                             & {0.982} \\
 oct$_h(bshr)$             & {0.994}                             & {0.988}\\
 oct$_h(hshr)$             & {\textbf{0.969}}                    & {0.953}\\
 oct$_h(shr)$              & \textcolor{red}{1.007}              & \textcolor{red}{1.000}
-\end{tabular}
+\end{tabular}}
 
 ## Key papers
+
 \fontsize{13}{15}\sf
+\begin{refsection}
+\nocite{temporal-hierarchies,Di_FonGir2022a,ctprob}
+\printbibliography[heading=none]
+\end{refsection}
 
-* \fullcite{temporal-hierarchies}
-* \fullcite{Di_FonGir2022a}
-* \fullcite{ctprob}
-
-## Software
+## Forecast reconciliation software
 \fontsize{11}{12}\sf\vspace*{0.3cm}
 
 \hspace*{-0.6cm}\begin{tabular}{llP{1.7cm}cP{1.7cm}c}
@@ -862,15 +859,17 @@ Package                                                                      & L
 ## More information
 \fontsize{18}{20}\sf
 
-\href{https://robjhyndman.com/frreview}{\faicon{newspaper} robjhyndman.com/frreview}
+\href{https://robjhyndman.com/frreview}{\faIcon*{file}\, robjhyndman.com/frreview}
 
-\href{https://robjhyndman.com/seminars/fr_overview.html}{\faicon{display} robjhyndman.com/frslides}
+\href{https://robjhyndman.com/seminars/fr_overview.html}{\includegraphics[width=0.5cm]{figs/slide}\,  robjhyndman.com/frslides}
 
 \href{https://aus.social/@robjhyndman}{\includegraphics[width=0.5cm]{figs/mastodon}\, aus.social/@robjhyndman}
 
-\href{https://github.com/robjhyndman}{\faicon{github}  @robjhyndman}
+\href{https://github.com/robjhyndman}{\faIcon{github}  @robjhyndman}
 
-\href{mailto:rob.hyndman@monash.edu}{\faicon{envelope}  rob.hyndman@monash.edu}
+\href{mailto:rob.hyndman@monash.edu}{\faIcon{envelope}  rob.hyndman@monash.edu}
 
-\nocite{hierarchical,fasthts, mint, hfreview, htsgeometry}
-\nocite{Di_FonGir2022a,temporal-hierarchies,ctprob}
+\nocite{hfreview}
+\nocite{hierarchical,fasthts,mint,htsgeometry,Di_FonGir2022b}
+\nocite{coherentprob,CorEtAl2022}
+\nocite{temporal-hierarchies,Di_FonGir2022a,ctprob}

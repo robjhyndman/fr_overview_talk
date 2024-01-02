@@ -103,11 +103,10 @@
 \setbeamerfont{section number projected}{size=\large}
 \setbeamertemplate{section in toc shaded}[default][50]
 
-
 % Redefine shaded environment if it exists (for R plots)
 \ifcsname Shaded\endcsname
   \definecolor{shadecolor}{RGB}{225,225,225}
-  \renewenvironment{Shaded}{\color{black}\begin{snugshade}\color{black}}{\end{snugshade}}
+  \renewenvironment{Shaded}{\color{black}\fontsize{10}{10}\sf\begin{snugshade}}{\end{snugshade}}
 \fi
 
 \setbeamertemplate{footline}{%
@@ -115,10 +114,9 @@
 
 % BIBLIOGRAPHIES
 
-\usepackage[style=authoryear,bibencoding=utf8,minnames=1,maxnames=3, maxbibnames=99,natbib=true,dashed=false,terseinits=true,giveninits=true,uniquename=false,uniquelist=false,labeldate=true,doi=false, isbn=false, natbib=true,backend=biber]{biblatex}
+\usepackage[style=authoryear,bibencoding=utf8,minnames=1,maxnames=99, maxbibnames=99,maxcitenames=99,natbib=true,url=true,dashed=false,firstinits=true,terseinits=true,giveninits=true,uniquename=false,uniquelist=false,labeldate=true,doi=false,isbn=false,sortcites=true,backend=biber,refsection=section]{biblatex}
 
 % Fix metropolis biblatex settings
-
 \setbeamerfont{bibliography entry title}{size=,series=}
 \setbeamerfont{bibliography entry author}{size=}
 \setbeamerfont{bibliography entry location}{size=}
@@ -151,5 +149,9 @@
 
 \AtEveryBibitem{\clearfield{month}}
 \AtEveryCitekey{\clearfield{month}}
-\AtBeginBibliography{\fontsize{11}{11}\sf}
+\AtBeginBibliography{\fontsize{12}{12.5}\sf}
 \setbeamertemplate{frametitle continuation}{}
+
+% Remove initials
+\DeclareNameAlias{sortname}{labelname}
+\DeclareDelimAlias{finalnamedelim}{multinamedelim}
